@@ -10,7 +10,7 @@ int main(int argc, char* argv[])
 	::t_thread* ts[10];
 	for (size_t i = 0; i < 10; ++i) ts[i] = engine.f_start_thread([&p, i]
 	{
-		std::printf("%d\n", i);
+		std::printf("%zu\n", i);
 		for (size_t j = 0; j < 100; ++j)
 			p = f_new<t_pair>(f_new<t_symbol>(std::to_string(i)), p);
 	});

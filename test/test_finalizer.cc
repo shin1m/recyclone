@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 	});
 	engine.f_collect();
 	engine.f_finalize();
-	std::printf("finalized: %d\n", v_finalized);
+	std::printf("finalized: %zu\n", v_finalized);
 	assert(v_finalized == 1);
 	return engine.f_exit(0);
 }

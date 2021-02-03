@@ -132,14 +132,14 @@ public:
 	template<typename T_each>
 	void f_statistics(T_each a_each) const
 	{
-		a_each(0, v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
-		a_each(1, v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
-		a_each(2, v_of2.v_grown.load(std::memory_order_relaxed), v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
-		a_each(3, v_of3.v_grown.load(std::memory_order_relaxed), v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
-		a_each(4, v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned);
-		a_each(5, v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned);
-		a_each(6, v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
-		a_each(57, 0, v_allocated, v_freed);
+		a_each(size_t(0), v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
+		a_each(size_t(1), v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
+		a_each(size_t(2), v_of2.v_grown.load(std::memory_order_relaxed), v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
+		a_each(size_t(3), v_of3.v_grown.load(std::memory_order_relaxed), v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
+		a_each(size_t(4), v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned);
+		a_each(size_t(5), v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned);
+		a_each(size_t(6), v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
+		a_each(size_t(57), size_t(0), v_allocated, v_freed);
 	}
 	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
