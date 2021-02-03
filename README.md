@@ -2,6 +2,10 @@
 
 Recyclone is a C++ implementation of a modified version of David F. Bacon's [Recycler](http://www.research.ibm.com/people/d/dfb/papers/Bacon03Pure.pdf).
 
+It requires C++17 or later.
+
+Currently, it is built and tested by using only GCC 10.x on Linux x86-64.
+
 # Features
 
 * Concurrent garbage collector
