@@ -4,7 +4,7 @@ Recyclone is a C++ implementation of a modified version of David F. Bacon's [Rec
 
 It requires C++17 or later.
 
-Currently, it is built and tested by using only GCC 10.x on Linux x86-64.
+Currently, it is built and tested only by using GCC 10.x on Linux x86-64.
 
 # Features
 
@@ -84,7 +84,7 @@ Therefore, the cycle collection can be skipped unless the number of live objects
 
 ## Scanning Object Graphs
 
-Scanning object graphs is done non-recursively by using a linked list.
+Scanning object graphs is done non-recursively by using an intrusive linked list.
 
 ## No Scanning Blacks on Each Increment/Decrement Operation
 
