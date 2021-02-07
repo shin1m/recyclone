@@ -11,6 +11,7 @@
 namespace recyclone
 {
 
+//! A set of thread data for garbage collection.
 template<typename T_type>
 class t_thread
 {
@@ -20,6 +21,14 @@ class t_thread
 	static inline thread_local t_thread* v_current;
 
 	t_thread* v_next;
+	/*!
+	  Running status:
+	    - -1: not started
+	    - 0: running
+	    - 1: done (increment)
+	    - 2: done (decrement and detect candidate cycles)
+	    - 3: done (collect cycles)
+	 */
 	int v_done = -1;
 	typename t_slot<T_type>::t_increments v_increments;
 	typename t_slot<T_type>::t_decrements v_decrements;
@@ -30,11 +39,18 @@ class t_thread
 #endif
 	std::unique_ptr<char[]> v_stack_buffer;
 	t_object<T_type>** v_stack_last_top;
+	//! Bottom of the copied stack of the last epoch.
 	t_object<T_type>** v_stack_last_bottom;
+	//! Bottom of the copied stack.
 	t_object<T_type>** v_stack_copy;
+	//! Bottom of the real stack.
 	t_object<T_type>** v_stack_bottom;
 	void* v_stack_limit;
 	t_object<T_type>** v_stack_top;
+	/*!
+	  Point at which reviving occurred.
+	  Until this point is processed, the collector postpones cycle collection if there is any object to be actually revived.
+	 */
 	t_object<T_type>* volatile* v_reviving = nullptr;
 
 	void f_initialize(void* a_bottom);
@@ -74,17 +90,30 @@ public:
 		return v_current;
 	}
 
+	/*!
+	  \sa t_engine::f_exit skips waiting for this thread to finish if true.
+	  Must be accessed with t_engine::v_thread__mutex locked.
+	 */
 	bool v_background = false;
 
 	t_thread();
+	/*!
+	  Gets the running status of the thread.
+	  \return
+	    - <0: not started
+	    - 0: running
+	    - >0: done
+	 */
 	int f_done() const
 	{
 		return v_done;
 	}
+	//! Gets the native handle.
 	auto f_handle() const
 	{
 		return v_handle;
 	}
+	//! Gets whether \p a_p is on the stack of the thread.
 	bool f_on_stack(void* a_p) const
 	{
 		return a_p >= v_stack_limit && a_p < static_cast<void*>(v_stack_bottom);

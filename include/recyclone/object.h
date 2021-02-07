@@ -35,6 +35,7 @@ class t_object
 		e_color__RED
 	};
 
+	//! Roots for candidate cycles.
 	static inline thread_local struct
 	{
 		t_object* v_next;
@@ -236,6 +237,10 @@ class t_object
 public:
 	using t_type = T_type;
 
+	/*!
+	  Finalizes the object construction.
+	  \param a_type The type of the object.
+	 */
 	RECYCLONE__ALWAYS_INLINE void f_bless(T_type* a_type)
 	{
 		a_type->f_own();
@@ -243,6 +248,7 @@ public:
 		v_type = a_type;
 		t_slot<T_type>::t_decrements::f_push(this);
 	}
+	//! Sets whether the finalizer should finalize the object.
 	void f_finalizee__(bool a_value)
 	{
 		v_finalizee = a_value;
@@ -251,6 +257,10 @@ public:
 	{
 		return v_type;
 	}
+	/*!
+	  Lazily populates the extension part of the object.
+	  \return The extension part.
+	 */
 	t_extension<T_type>* f_extension();
 };
 

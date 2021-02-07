@@ -9,45 +9,6 @@
 namespace recyclone
 {
 
-struct t_conductor
-{
-	bool v_running = true;
-	bool v_quitting = false;
-	std::mutex v_mutex;
-	std::condition_variable v_wake;
-	std::condition_variable v_done;
-
-	void f_next(std::unique_lock<std::mutex>& a_lock)
-	{
-		v_running = false;
-		v_done.notify_all();
-		do v_wake.wait(a_lock); while (!v_running);
-	}
-	void f_exit()
-	{
-		std::lock_guard lock(v_mutex);
-		v_running = false;
-		v_done.notify_one();
-	}
-	void f_wake()
-	{
-		if (v_running) return;
-		v_running = true;
-		v_wake.notify_one();
-	}
-	void f_wait(std::unique_lock<std::mutex>& a_lock)
-	{
-		do v_done.wait(a_lock); while (v_running);
-	}
-	void f_quit()
-	{
-		std::unique_lock lock(v_mutex);
-		v_running = v_quitting = true;
-		v_wake.notify_one();
-		f_wait(lock);
-	}
-};
-
 template<typename T_type>
 t_engine<T_type>* f_engine();
 
@@ -58,6 +19,45 @@ class t_engine
 	friend class t_weak_pointer<T_type>;
 	friend class t_thread<T_type>;
 	friend t_engine* f_engine<T_type>();
+
+	struct t_conductor
+	{
+		bool v_running = true;
+		bool v_quitting = false;
+		std::mutex v_mutex;
+		std::condition_variable v_wake;
+		std::condition_variable v_done;
+
+		void f_next(std::unique_lock<std::mutex>& a_lock)
+		{
+			v_running = false;
+			v_done.notify_all();
+			do v_wake.wait(a_lock); while (!v_running);
+		}
+		void f_exit()
+		{
+			std::lock_guard lock(v_mutex);
+			v_running = false;
+			v_done.notify_one();
+		}
+		void f_wake()
+		{
+			if (v_running) return;
+			v_running = true;
+			v_wake.notify_one();
+		}
+		void f_wait(std::unique_lock<std::mutex>& a_lock)
+		{
+			do v_done.wait(a_lock); while (v_running);
+		}
+		void f_quit()
+		{
+			std::unique_lock lock(v_mutex);
+			v_running = v_quitting = true;
+			v_wake.notify_one();
+			f_wait(lock);
+		}
+	};
 
 protected:
 	static inline thread_local t_engine* v_instance;
@@ -146,7 +146,18 @@ public:
 
 	t_engine(const t_options& a_options);
 	~t_engine();
+	/*!
+	  Performs the exit sequence:
+	  - Waits for foreground threads to finish.
+	  - If \sa t_options::v_verify is true,
+	    - Tries to collect all the objects and detects leaks.
+	    - Returns \p a_code.
+	  - Otherwise, immediately calls \sa std::exit with \p a_code.
+	  \param a_code The exit code.
+	  \return \p a_code.
+	 */
 	int f_exit(int a_code);
+	//! Triggers garbage collection.
 	void f_tick()
 	{
 		if (v_collector__conductor.v_running) return;
@@ -154,6 +165,7 @@ public:
 		++v_collector__tick;
 		v_collector__conductor.f_wake();
 	}
+	//! Triggers garbage collection and waits for it to finish.
 	void f_wait()
 	{
 		std::unique_lock lock(v_collector__conductor.v_mutex);
@@ -161,29 +173,26 @@ public:
 		v_collector__conductor.f_wake();
 		v_collector__conductor.f_wait(lock);
 	}
+	//! Allocates a new object with the size \p a_size.
 	RECYCLONE__ALWAYS_INLINE constexpr t_object<T_type>* f_allocate(size_t a_size)
 	{
 		auto p = v_object__heap.f_allocate(a_size);
 		p->v_next = nullptr;
 		return p;
 	}
+	//! Performs full garbage collection.
 	void f_collect();
+	//! Performs finalization.
 	void f_finalize();
-	size_t f_load_count() const
-	{
-		size_t n = 0;
-		v_object__heap.f_statistics([&](auto, auto, auto a_allocated, auto a_freed)
-		{
-			n += a_allocated - a_freed;
-		});
-		return n;
-	}
+	//! Gets whether the exit sequence finished waiting foreground threads.
 	bool f_exiting() const
 	{
 		return v_exiting;
 	}
+	//! Starts a new thread that calls \p a_main for \p a_thread.
 	template<typename T_thread, typename T_main>
 	void f_start(T_thread* a_thread, T_main a_main);
+	//! Waits for \p a_thread to finish.
 	template<typename T_thread>
 	void f_join(T_thread* a_thread);
 };
