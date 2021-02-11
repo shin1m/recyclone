@@ -47,7 +47,7 @@ T* f_new(T_an&&... a_n)
 	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
 	p->f_construct(std::forward<T_an>(a_n)...);
 	// Finishes object construction.
-	p->f_bless(&t_type_of<T>::v_instance);
+	p->f_be(&t_type_of<T>::v_instance);
 	return p;
 }
 

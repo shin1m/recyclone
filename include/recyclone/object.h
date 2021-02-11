@@ -12,7 +12,7 @@ template<typename T_type>
 class t_extension;
 
 template<typename T_type>
-using t_scan = void (*)(t_slot<T_type>&);
+using t_scan = void(*)(t_slot<T_type>&);
 
 template<typename T_type>
 class t_object
@@ -241,7 +241,7 @@ public:
 	  Finalizes the object construction.
 	  \param a_type The type of the object.
 	 */
-	RECYCLONE__ALWAYS_INLINE void f_bless(T_type* a_type)
+	RECYCLONE__ALWAYS_INLINE void f_be(T_type* a_type)
 	{
 		a_type->f_own();
 		std::atomic_signal_fence(std::memory_order_release);

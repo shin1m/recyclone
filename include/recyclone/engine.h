@@ -327,7 +327,6 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 }), v_options(a_options)
 {
 	v_instance = this;
-	v_thread__main = new t_thread<T_type>();
 	if (sem_init(&v_epoch__received, 0, 0) == -1) throw std::system_error(errno, std::generic_category());
 	sigfillset(&v_epoch__notsigusr2);
 	sigdelset(&v_epoch__notsigusr2, SIGUSR2);
@@ -345,6 +344,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
+	v_thread__main = new t_thread<T_type>();
 	v_thread__main->f_initialize(this);
 	std::unique_lock lock(v_collector__conductor.v_mutex);
 	std::thread(&t_engine::f_collector, this).detach();

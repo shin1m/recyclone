@@ -18,7 +18,7 @@ struct t_type_of : t_type
 		auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
 		p->f_construct(std::forward<T_an>(a_n)...);
 		// Finishes object construction.
-		p->f_bless(this);
+		p->f_be(this);
 		return p;
 	}
 };
@@ -34,7 +34,7 @@ struct t_type_of<t_type> : t_type
 		{
 		};
 		// t_type_of<t_type> is also an instance of t_type_of<t_type>.
-		p->f_bless(p);
+		p->f_be(p);
 		return p;
 	}
 
@@ -49,7 +49,7 @@ struct t_type_of<t_type> : t_type
 			static_cast<T*>(a_this)->f_scan(a_scan);
 		};
 		// t_type_of<T> is an instance of t_type_of<t_type>.
-		p->f_bless(this);
+		p->f_be(this);
 		return p;
 	}
 };
