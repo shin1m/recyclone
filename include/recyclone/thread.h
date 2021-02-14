@@ -146,19 +146,16 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 template<typename T_type>
 void t_thread<T_type>::f_epoch()
 {
-	t_object<T_type>** top0;
-	t_object<T_type>** bottom0;
+	auto top0 = v_stack_copy;
 	auto top1 = v_stack_last_bottom;
 	if (v_done > 0) {
 		++v_done;
-		top0 = bottom0 = nullptr;
 	} else {
 		f_epoch_suspend();
 		auto n = v_stack_bottom - v_stack_top;
-		top0 = v_stack_copy - n;
-		std::memcpy(top0, v_stack_top, n * sizeof(t_object<T_type>**));
+		top0 -= n;
+		std::memcpy(top0, v_stack_top, n * sizeof(t_object<T_type>*));
 		f_epoch_resume();
-		bottom0 = top0 + n;
 		top1 -= n;
 	}
 	auto decrements = v_stack_last_bottom;
@@ -175,7 +172,7 @@ void t_thread<T_type>::f_epoch()
 		} else {
 			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
 		}
-		for (; top0 < bottom0; ++top1) {
+		for (; top0 < v_stack_copy; ++top1) {
 			auto p = *top0++;
 			auto q = *top1;
 			if (p == q) continue;

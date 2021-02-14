@@ -349,7 +349,7 @@ void t_object<T_type>::f_collect()
 	auto roots = reinterpret_cast<t_object*>(&v_roots);
 	if (roots->v_next == roots) return;
 	{
-		size_t live = f_engine<T_type>()->v_object__heap.f_live();
+		auto live = f_engine<T_type>()->v_object__heap.f_live();
 		auto& lower = f_engine<T_type>()->v_object__lower;
 		if (live < lower) lower = live;
 		if (live - lower < f_engine<T_type>()->v_collector__threshold) return;

@@ -216,8 +216,7 @@ void t_engine<T_type>::f_collector()
 		}
 		{
 			std::lock_guard lock(v_thread__mutex);
-			auto p = &v_thread__head;
-			while (*p) {
+			for (auto p = &v_thread__head; *p;) {
 				auto q = *p;
 				auto active = q->v_done >= 0;
 				if (active && q == v_thread__finalizer && q->v_done <= 0) {
@@ -323,7 +322,7 @@ size_t t_engine<T_type>::f_statistics()
 template<typename T_type>
 t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
 {
-	f_engine<T_type>()->f_wait();
+	v_instance->f_wait();
 }), v_options(a_options)
 {
 	v_instance = this;
@@ -340,7 +339,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 	sa.sa_handler = [](int)
 	{
 		t_thread<T_type>::v_current->f_epoch_get();
-		f_engine<T_type>()->f_epoch_suspend();
+		v_instance->f_epoch_suspend();
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
