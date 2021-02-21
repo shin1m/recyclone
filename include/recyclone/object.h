@@ -18,7 +18,7 @@ template<typename T_type>
 class t_object
 {
 	friend T_type;
-	template<typename T> friend class t_heap;
+	template<typename> friend class t_heap;
 	friend class t_slot<T_type>;
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
@@ -36,14 +36,14 @@ class t_object
 	};
 
 	//! Roots for candidate cycles.
-	static inline thread_local struct
+	static inline RECYCLONE__THREAD struct
 	{
 		t_object* v_next;
 		t_object* v_previous;
 	} v_roots;
-	static inline thread_local t_object* v_scan_stack;
-	static inline thread_local t_object* v_cycle;
-	static inline thread_local t_object* v_cycles;
+	static inline RECYCLONE__THREAD t_object* v_scan_stack;
+	static inline RECYCLONE__THREAD t_object* v_cycle;
+	static inline RECYCLONE__THREAD t_object* v_cycles;
 
 	RECYCLONE__FORCE_INLINE static void f_append(t_object* a_p)
 	{

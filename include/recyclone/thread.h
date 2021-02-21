@@ -18,7 +18,7 @@ class t_thread
 	friend class t_weak_pointer<T_type>;
 	friend class t_engine<T_type>;
 
-	static inline thread_local t_thread* v_current;
+	static inline RECYCLONE__THREAD t_thread* v_current;
 
 	t_thread* v_next;
 	/*!
@@ -163,15 +163,14 @@ void t_thread<T_type>::f_epoch()
 		auto top2 = v_stack_last_top;
 		v_stack_last_top = top1;
 		std::lock_guard lock(f_engine<T_type>()->v_object__heap.f_mutex());
-		if (top1 < top2) {
+		if (top1 < top2)
 			do {
 				auto p = f_engine<T_type>()->f_object__find(*top0++);
 				if (p) p->f_increment();
 				*top1++ = p;
 			} while (top1 < top2);
-		} else {
+		else
 			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
-		}
 		for (; top0 < v_stack_copy; ++top1) {
 			auto p = *top0++;
 			auto q = *top1;

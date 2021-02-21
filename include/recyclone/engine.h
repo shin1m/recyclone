@@ -60,7 +60,7 @@ class t_engine
 	};
 
 protected:
-	static inline thread_local t_engine* v_instance;
+	static inline RECYCLONE__THREAD t_engine* v_instance;
 
 	t_conductor v_collector__conductor;
 	size_t v_collector__threshold;
