@@ -8,11 +8,21 @@
 namespace recyclone
 {
 
-template<typename T_type>
-class t_extension;
+template<typename> class t_extension;
 
 template<typename T_type>
 using t_scan = void(*)(t_slot<T_type>&);
+
+enum t_color : char
+{
+	e_color__BLACK,
+	e_color__PURPLE,
+	e_color__GRAY,
+	e_color__WHITING,
+	e_color__WHITE,
+	e_color__ORANGE,
+	e_color__RED
+};
 
 template<typename T_type>
 class t_object
@@ -24,17 +34,6 @@ class t_object
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
 
-	enum t_color : char
-	{
-		e_color__BLACK,
-		e_color__PURPLE,
-		e_color__GRAY,
-		e_color__WHITING,
-		e_color__WHITE,
-		e_color__ORANGE,
-		e_color__RED
-	};
-
 	//! Roots for candidate cycles.
 	static inline RECYCLONE__THREAD struct
 	{
@@ -43,7 +42,6 @@ class t_object
 	} v_roots;
 	static inline RECYCLONE__THREAD t_object* v_scan_stack;
 	static inline RECYCLONE__THREAD t_object* v_cycle;
-	static inline RECYCLONE__THREAD t_object* v_cycles;
 
 	RECYCLONE__FORCE_INLINE static void f_append(t_object* a_p)
 	{
@@ -69,7 +67,6 @@ class t_object
 		p->template f_push<A_push>();
 		a_slot.v_p.store(nullptr, std::memory_order_relaxed);
 	}
-	static void f_collect();
 
 	t_object* v_next;
 	t_object* v_previous;
@@ -263,145 +260,6 @@ public:
 	 */
 	t_extension<T_type>* f_extension();
 };
-
-template<typename T_type>
-void t_object<T_type>::f_collect()
-{
-	while (v_cycles) {
-		std::lock_guard lock(f_engine<T_type>()->v_object__reviving__mutex);
-		auto cycle = v_cycles;
-		v_cycles = cycle->v_next_cycle;
-		auto p = cycle;
-		auto mutated = [&]
-		{
-			if (f_engine<T_type>()->v_object__reviving)
-				do {
-					if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true;
-					if (auto q = p->v_extension.load(std::memory_order_relaxed)) if (q->v_weak_pointers__cycle) return true;
-				} while ((p = p->v_next) != cycle);
-			else
-				do if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true; while ((p = p->v_next) != cycle);
-			return false;
-		};
-		if (mutated()) {
-			p = cycle;
-			auto q = p->v_next;
-			if (p->v_color == e_color__ORANGE) {
-				p->v_color = e_color__PURPLE;
-				f_append(p);
-			} else if (p->v_color == e_color__PURPLE) {
-				f_append(p);
-			} else {
-				p->v_color = e_color__BLACK;
-				p->v_next = nullptr;
-			}
-			while (q != cycle) {
-				p = q;
-				q = p->v_next;
-				if (p->v_color == e_color__PURPLE) {
-					f_append(p);
-				} else {
-					p->v_color = e_color__BLACK;
-					p->v_next = nullptr;
-				}
-			}
-		} else {
-			auto finalizee = false;
-			do
-				if (p->v_finalizee) {
-					finalizee = true;
-					p = cycle;
-					break;
-				}
-			while ((p = p->v_next) != cycle);
-			if (finalizee) {
-				auto& conductor = f_engine<T_type>()->v_finalizer__conductor;
-				std::lock_guard lock(conductor.v_mutex);
-				if (conductor.v_quitting) {
-					finalizee = false;
-				} else {
-					auto& queue = f_engine<T_type>()->v_finalizer__queue;
-					do {
-						if (auto q = p->v_extension.load(std::memory_order_relaxed)) q->f_detach();
-						auto q = p->v_next;
-						p->v_color = e_color__BLACK;
-						p->v_next = nullptr;
-						if (p->v_finalizee) {
-							++p->v_count;
-							queue.push_back(p);
-						}
-						p = q;
-					} while (p != cycle);
-					conductor.f_wake();
-				}
-			}
-			if (!finalizee) {
-				do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
-				do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
-				do {
-					auto q = p->v_next;
-					f_engine<T_type>()->f_free_as_collect(p);
-					p = q;
-				} while (p != cycle);
-			}
-		}
-	}
-	auto roots = reinterpret_cast<t_object*>(&v_roots);
-	if (roots->v_next == roots) return;
-	{
-		auto live = f_engine<T_type>()->v_object__heap.f_live();
-		auto& lower = f_engine<T_type>()->v_object__lower;
-		if (live < lower) lower = live;
-		if (live - lower < f_engine<T_type>()->v_collector__threshold) return;
-		lower = live;
-		++f_engine<T_type>()->v_collector__collect;
-		auto p = roots;
-		auto q = p->v_next;
-		do {
-			assert(q->v_count > 0);
-			if (q->v_color == e_color__PURPLE) {
-				q->f_mark_gray();
-				p = q;
-			} else {
-				p->v_next = q->v_next;
-				q->v_next = nullptr;
-			}
-			q = p->v_next;
-		} while (q != roots);
-	}
-	if (roots->v_next == roots) {
-		roots->v_previous = roots;
-		return;
-	}
-	{
-		auto p = roots->v_next;
-		do {
-			p->f_scan_gray();
-			p = p->v_next;
-		} while (p != roots);
-	}
-	do {
-		auto p = roots->v_next;
-		roots->v_next = p->v_next;
-		if (p->v_color == e_color__WHITE) {
-			p->f_collect_white();
-			v_cycle->v_next_cycle = v_cycles;
-			v_cycles = v_cycle;
-		} else {
-			p->v_next = nullptr;
-		}
-	} while (roots->v_next != roots);
-	roots->v_previous = roots;
-	for (auto cycle = v_cycles; cycle; cycle = cycle->v_next_cycle) {
-		auto p = cycle;
-		do {
-			p->v_color = e_color__RED;
-			p->v_cyclic = p->v_count;
-		} while ((p = p->v_next) != cycle);
-		do p->template f_step<&t_object::f_scan_red>(); while ((p = p->v_next) != cycle);
-		do p->v_color = e_color__ORANGE; while ((p = p->v_next) != cycle);
-	}
-}
 
 template<typename T_type>
 bool t_object<T_type>::f_queue_finalize()

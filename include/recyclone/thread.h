@@ -15,8 +15,8 @@ namespace recyclone
 template<typename T_type>
 class t_thread
 {
-	friend class t_weak_pointer<T_type>;
 	friend class t_engine<T_type>;
+	friend class t_weak_pointer<T_type>;
 
 	static inline RECYCLONE__THREAD t_thread* v_current;
 

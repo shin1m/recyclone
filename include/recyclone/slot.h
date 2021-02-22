@@ -7,25 +7,20 @@
 namespace recyclone
 {
 
-template<typename T_type>
-class t_object;
-template<typename T_type>
-class t_weak_pointer;
-template<typename T_type>
-class t_thread;
-template<typename T_type>
-class t_engine;
+template<typename> class t_object;
+template<typename> class t_thread;
+template<typename> class t_engine;
 template<typename T_type>
 t_engine<T_type>* f_engine();
+template<typename> class t_weak_pointer;
 
 template<typename T_type>
 class t_slot
 {
-	friend T_type;
 	friend class t_object<T_type>;
-	friend class t_weak_pointer<T_type>;
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
+	friend class t_weak_pointer<T_type>;
 
 	template<size_t A_SIZE>
 	struct t_queue

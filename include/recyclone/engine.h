@@ -69,6 +69,7 @@ protected:
 	size_t v_collector__epoch = 0;
 	size_t v_collector__collect = 0;
 	size_t v_collector__full = 0;
+	t_object<T_type>* v_cycles = nullptr;
 	t_heap<t_object<T_type>> v_object__heap;
 	size_t v_object__lower = 0;
 	bool v_object__reviving = false;
@@ -245,7 +246,139 @@ void t_engine<T_type>::f_collector()
 				}
 			}
 		}
-		t_object<T_type>::f_collect();
+		while (v_cycles) {
+			std::lock_guard lock(v_object__reviving__mutex);
+			auto cycle = v_cycles;
+			v_cycles = cycle->v_next_cycle;
+			auto p = cycle;
+			auto mutated = [&]
+			{
+				if (v_object__reviving)
+					do {
+						if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true;
+						if (auto q = p->v_extension.load(std::memory_order_relaxed)) if (q->v_weak_pointers__cycle) return true;
+					} while ((p = p->v_next) != cycle);
+				else
+					do if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true; while ((p = p->v_next) != cycle);
+				return false;
+			};
+			if (mutated()) {
+				p = cycle;
+				auto q = p->v_next;
+				if (p->v_color == e_color__ORANGE) {
+					p->v_color = e_color__PURPLE;
+					t_object<T_type>::f_append(p);
+				} else if (p->v_color == e_color__PURPLE) {
+					t_object<T_type>::f_append(p);
+				} else {
+					p->v_color = e_color__BLACK;
+					p->v_next = nullptr;
+				}
+				while (q != cycle) {
+					p = q;
+					q = p->v_next;
+					if (p->v_color == e_color__PURPLE) {
+						t_object<T_type>::f_append(p);
+					} else {
+						p->v_color = e_color__BLACK;
+						p->v_next = nullptr;
+					}
+				}
+			} else {
+				auto finalizee = false;
+				do
+					if (p->v_finalizee) {
+						finalizee = true;
+						p = cycle;
+						break;
+					}
+				while ((p = p->v_next) != cycle);
+				if (finalizee) {
+					std::lock_guard lock(v_finalizer__conductor.v_mutex);
+					if (v_finalizer__conductor.v_quitting) {
+						finalizee = false;
+					} else {
+						do {
+							if (auto q = p->v_extension.load(std::memory_order_relaxed)) q->f_detach();
+							auto q = p->v_next;
+							p->v_color = e_color__BLACK;
+							p->v_next = nullptr;
+							if (p->v_finalizee) {
+								++p->v_count;
+								v_finalizer__queue.push_back(p);
+							}
+							p = q;
+						} while (p != cycle);
+						v_finalizer__conductor.f_wake();
+					}
+				}
+				if (!finalizee) {
+					do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
+					do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
+					do {
+						auto q = p->v_next;
+						f_free_as_collect(p);
+						p = q;
+					} while (p != cycle);
+				}
+			}
+		}
+		auto roots = reinterpret_cast<t_object<T_type>*>(&t_object<T_type>::v_roots);
+		if (roots->v_next != roots) {
+			auto live = v_object__heap.f_live();
+			if (live < v_object__lower) v_object__lower = live;
+			if (live - v_object__lower >= v_collector__threshold) {
+				v_object__lower = live;
+				++v_collector__collect;
+				{
+					auto p = roots;
+					auto q = p->v_next;
+					do {
+						assert(q->v_count > 0);
+						if (q->v_color == e_color__PURPLE) {
+							q->f_mark_gray();
+							p = q;
+						} else {
+							p->v_next = q->v_next;
+							q->v_next = nullptr;
+						}
+						q = p->v_next;
+					} while (q != roots);
+				}
+				if (roots->v_next == roots) {
+					roots->v_previous = roots;
+				} else {
+					{
+						auto p = roots->v_next;
+						do {
+							p->f_scan_gray();
+							p = p->v_next;
+						} while (p != roots);
+					}
+					do {
+						auto p = roots->v_next;
+						roots->v_next = p->v_next;
+						if (p->v_color == e_color__WHITE) {
+							p->f_collect_white();
+							t_object<T_type>::v_cycle->v_next_cycle = v_cycles;
+							v_cycles = t_object<T_type>::v_cycle;
+						} else {
+							p->v_next = nullptr;
+						}
+					} while (roots->v_next != roots);
+					roots->v_previous = roots;
+					for (auto cycle = v_cycles; cycle; cycle = cycle->v_next_cycle) {
+						auto p = cycle;
+						do {
+							p->v_color = e_color__RED;
+							p->v_cyclic = p->v_count;
+						} while ((p = p->v_next) != cycle);
+						do p->template f_step<&t_object<T_type>::f_scan_red>(); while ((p = p->v_next) != cycle);
+						do p->v_color = e_color__ORANGE; while ((p = p->v_next) != cycle);
+					}
+				}
+			}
+		}
 		v_object__heap.f_flush();
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "collector quitting...\n");

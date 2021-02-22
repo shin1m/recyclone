@@ -109,6 +109,7 @@ template<typename T_type>
 class t_extension
 {
 	friend class t_object<T_type>;
+	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
 
 	t_weak_pointers<T_type> v_weak_pointers;
