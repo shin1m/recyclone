@@ -337,9 +337,7 @@ void t_engine<T_type>::f_collector()
 						q = p->v_next;
 					} while (q != roots);
 				}
-				if (roots->v_next == roots) {
-					roots->v_previous = roots;
-				} else {
+				if (roots->v_next != roots) {
 					{
 						auto p = roots->v_next;
 						do {
@@ -352,23 +350,18 @@ void t_engine<T_type>::f_collector()
 						roots->v_next = p->v_next;
 						if (p->v_color == e_color__WHITE) {
 							p->f_collect_white();
-							t_object<T_type>::v_cycle->v_next_cycle = v_cycles;
-							v_cycles = t_object<T_type>::v_cycle;
+							auto cycle = t_object<T_type>::v_cycle;
+							auto q = cycle;
+							do q->template f_step<&t_object<T_type>::f_scan_red>(); while ((q = q->v_next) != cycle);
+							do q->v_color = e_color__ORANGE; while ((q = q->v_next) != cycle);
+							cycle->v_next_cycle = v_cycles;
+							v_cycles = cycle;
 						} else {
 							p->v_next = nullptr;
 						}
 					} while (roots->v_next != roots);
-					roots->v_previous = roots;
-					for (auto cycle = v_cycles; cycle; cycle = cycle->v_next_cycle) {
-						auto p = cycle;
-						do {
-							p->v_color = e_color__RED;
-							p->v_cyclic = p->v_count;
-						} while ((p = p->v_next) != cycle);
-						do p->template f_step<&t_object<T_type>::f_scan_red>(); while ((p = p->v_next) != cycle);
-						do p->v_color = e_color__ORANGE; while ((p = p->v_next) != cycle);
-					}
 				}
+				roots->v_previous = roots;
 			}
 		}
 		v_object__heap.f_flush();
