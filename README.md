@@ -94,6 +94,12 @@ Scanning blacks on every increment/decrement operation turned out to be expensiv
 
 The increment/decrement operations are changed to mark just only their target objects as black/purple respectively.
 
+## Cyclic Decrement
+
+There is a case in which the reference count of an orange object is decremented to zero by cyclic decrement, where a red object in a garbage cycle has the last reference to an orange object in the other candidate cycle.
+
+The cyclic decrement is changed to release the orange object in this case.
+
 # License
 
 The MIT License (MIT)

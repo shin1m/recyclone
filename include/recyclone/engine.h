@@ -91,10 +91,6 @@ protected:
 	uint8_t v_finalizer__awaken = 0;
 	bool v_exiting = false;
 
-	void f_object__return()
-	{
-		v_object__heap.f_return();
-	}
 	void f_free(t_object<T_type>* a_p)
 	{
 		a_p->v_count = 1;
@@ -250,49 +246,43 @@ void t_engine<T_type>::f_collector()
 			std::lock_guard lock(v_object__reviving__mutex);
 			auto cycle = v_cycles;
 			v_cycles = cycle->v_next_cycle;
+			auto mutated = false;
+			auto finalizee = false;
 			auto p = cycle;
-			auto mutated = [&]
-			{
-				if (v_object__reviving)
-					do {
-						if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true;
-						if (auto q = p->v_extension.load(std::memory_order_relaxed)) if (q->v_weak_pointers__cycle) return true;
-					} while ((p = p->v_next) != cycle);
-				else
-					do if (p->v_color != e_color__ORANGE || p->v_cyclic > 0) return true; while ((p = p->v_next) != cycle);
-				return false;
-			};
-			if (mutated()) {
-				p = cycle;
+			while (true) {
 				auto q = p->v_next;
-				if (p->v_color == e_color__ORANGE) {
-					p->v_color = e_color__PURPLE;
-					t_object<T_type>::f_append(p);
-				} else if (p->v_color == e_color__PURPLE) {
-					t_object<T_type>::f_append(p);
-				} else {
-					p->v_color = e_color__BLACK;
-					p->v_next = nullptr;
-				}
-				while (q != cycle) {
+				if (q->v_type) {
+					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0)
+						mutated = true;
+					else if (v_object__reviving)
+					       if (auto p = q->v_extension.load(std::memory_order_relaxed)) if (p->v_weak_pointers__cycle) mutated = true;
+					if (q->v_finalizee) finalizee = true;
 					p = q;
-					q = p->v_next;
+					if (p == cycle) break;
+				} else {
+					p->v_next = q->v_next;
+					f_free_as_collect(q);
+					if (q == cycle) {
+						cycle = p == q ? nullptr : p;
+						break;
+					}
+				}
+			}
+			if (!cycle) continue;
+			if (mutated) {
+				p = cycle;
+				if (p->v_color == e_color__ORANGE) p->v_color = e_color__PURPLE;
+				do {
+					auto q = p->v_next;
 					if (p->v_color == e_color__PURPLE) {
 						t_object<T_type>::f_append(p);
 					} else {
 						p->v_color = e_color__BLACK;
 						p->v_next = nullptr;
 					}
-				}
+					p = q;
+				} while (p != cycle);
 			} else {
-				auto finalizee = false;
-				do
-					if (p->v_finalizee) {
-						finalizee = true;
-						p = cycle;
-						break;
-					}
-				while ((p = p->v_next) != cycle);
 				if (finalizee) {
 					std::lock_guard lock(v_finalizer__conductor.v_mutex);
 					if (v_finalizer__conductor.v_quitting) {
@@ -301,11 +291,13 @@ void t_engine<T_type>::f_collector()
 						do {
 							if (auto q = p->v_extension.load(std::memory_order_relaxed)) q->f_detach();
 							auto q = p->v_next;
-							p->v_color = e_color__BLACK;
-							p->v_next = nullptr;
 							if (p->v_finalizee) {
-								++p->v_count;
+								p->f_increment();
+								p->v_next = nullptr;
 								v_finalizer__queue.push_back(p);
+							} else {
+								p->v_color = e_color__PURPLE;
+								t_object<T_type>::f_append(p);
 							}
 							p = q;
 						} while (p != cycle);
@@ -535,7 +527,7 @@ int t_engine<T_type>::f_exit(int a_code)
 		v_exiting = true;
 	}
 	if (v_options.v_verify) {
-		f_object__return();
+		v_object__heap.f_return();
 		{
 			std::lock_guard lock(v_collector__conductor.v_mutex);
 			if (v_collector__full++ <= 0) v_collector__threshold = 0;
@@ -606,7 +598,7 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 				main();
 			} catch (...) {
 			}
-			f_object__return();
+			v_object__heap.f_return();
 			{
 				std::lock_guard lock(v_thread__mutex);
 				internal->v_background = false;

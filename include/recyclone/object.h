@@ -108,8 +108,10 @@ class t_object
 		++v_count;
 		v_color = e_color__BLACK;
 	}
+	bool f_queue_finalize();
 	void f_decrement_push()
 	{
+		assert(v_count > 0);
 		if (--v_count > 0) {
 			v_color = e_color__PURPLE;
 			if (!v_next) f_append(this);
@@ -117,7 +119,6 @@ class t_object
 			f_push(this);
 		}
 	}
-	bool f_queue_finalize();
 	void f_decrement_step()
 	{
 		if (auto p = v_extension.load(std::memory_order_consume)) {
@@ -130,6 +131,7 @@ class t_object
 		v_type = nullptr;
 		v_color = e_color__BLACK;
 		if (v_next) {
+			if (!v_previous) return;
 			v_next->v_previous = v_previous;
 			v_previous->v_next = v_next;
 		}
@@ -200,15 +202,19 @@ class t_object
 	void f_collect_white_push()
 	{
 		if (v_color != e_color__WHITE) return;
-		v_color = e_color__ORANGE;
+		v_color = e_color__RED;
+		v_cyclic = v_count;
 		v_next = v_cycle->v_next;
 		v_cycle->v_next = this;
+		v_previous = nullptr;
 		f_push(this);
 	}
 	void f_collect_white()
 	{
-		v_color = e_color__ORANGE;
+		v_color = e_color__RED;
+		v_cyclic = v_count;
 		v_cycle = v_next = this;
+		v_previous = nullptr;
 		f_loop<&t_object::f_step<&t_object::f_collect_white_push>>();
 	}
 	void f_scan_red()
@@ -218,14 +224,24 @@ class t_object
 	void f_cyclic_decrement_push()
 	{
 		if (v_color == e_color__RED) return;
-		if (v_color == e_color__ORANGE) {
-			--v_count;
-			--v_cyclic;
-		} else {
+		if (v_color != e_color__ORANGE)
 			f_decrement();
-		}
+		else if (--v_count > 0)
+			--v_cyclic;
+		else if (!v_finalizee || !f_queue_finalize())
+			f_loop<&t_object::f_decrement_step>();
 	}
-	void f_cyclic_decrement();
+	void f_cyclic_decrement()
+	{
+		if (auto p = v_extension.load(std::memory_order_consume)) {
+			p->f_scan(f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+			v_extension.store(nullptr, std::memory_order_relaxed);
+			delete p;
+		}
+		v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+		v_type->f_cyclic_decrement_push();
+		v_type = nullptr;
+	}
 	void f_own()
 	{
 		t_slot<T_type>::t_increments::f_push(this);
@@ -271,19 +287,6 @@ bool t_object<T_type>::f_queue_finalize()
 	f_engine<T_type>()->v_finalizer__queue.push_back(this);
 	conductor.f_wake();
 	return true;
-}
-
-template<typename T_type>
-void t_object<T_type>::f_cyclic_decrement()
-{
-	if (auto p = v_extension.load(std::memory_order_consume)) {
-		p->f_scan(f_push_and_clear<&t_object::f_cyclic_decrement_push>);
-		v_extension.store(nullptr, std::memory_order_relaxed);
-		delete p;
-	}
-	v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
-	v_type->f_cyclic_decrement_push();
-	v_type = nullptr;
 }
 
 template<typename T_type>

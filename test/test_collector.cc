@@ -46,6 +46,7 @@ t_pair* f_put(t_pair* a_xs, size_t a_i, t_object<t_type>* a_x)
 int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
+	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = options.v_verify = true;
 	t_engine<t_type> engine(options);
 	auto towers = f_hanoi(
