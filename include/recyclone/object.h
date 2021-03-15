@@ -72,13 +72,13 @@ class t_object
 	t_object* v_previous;
 	t_object* v_scan;
 	t_color v_color;
-	bool v_finalizee = false;
+	bool v_finalizee;
 	size_t v_count = 1;
 	size_t v_cyclic;
 	size_t v_rank;
 	t_object* v_next_cycle;
-	T_type* v_type = nullptr;
-	std::atomic<t_extension<T_type>*> v_extension = nullptr;
+	T_type* v_type;
+	std::atomic<t_extension<T_type>*> v_extension;
 
 	template<void (t_object::*A_push)()>
 	void f_push()
