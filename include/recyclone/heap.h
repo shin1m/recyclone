@@ -43,16 +43,14 @@ class t_heap
 				a_heap.v_blocks.emplace(q, length);
 			}
 			v_grown.fetch_add(A_size, std::memory_order_relaxed);
+			a_heap.v_tick();
 			return q;
 		}
-		T* f_allocate(t_heap* a_heap)
+		T* f_allocate(t_heap& a_heap)
 		{
 			auto p = v_chunks.load(std::memory_order_acquire);
 			while (p && !v_chunks.compare_exchange_weak(p, p->v_previous, std::memory_order_acquire));
-			if (!p) {
-				if (!a_heap) return nullptr;
-				p = f_grow(*a_heap);
-			}
+			if (!p) p = f_grow(a_heap);
 			v_allocated.fetch_add(p->v_cyclic, std::memory_order_relaxed);
 			return p;
 		}
@@ -91,7 +89,7 @@ class t_heap
 	template<size_t A_rank>
 	static inline RECYCLONE__THREAD T* v_head;
 
-	void(*v_wait)();
+	void(*v_tick)();
 	std::map<T*, size_t> v_blocks;
 	std::mutex v_mutex;
 	t_of<0, 1024 * 64> v_of0;
@@ -118,7 +116,7 @@ class t_heap
 	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
-	t_heap(void(*a_wait)()) : v_wait(a_wait)
+	t_heap(void(*a_tick)()) : v_tick(a_tick)
 	{
 	}
 	~t_heap()
@@ -224,11 +222,7 @@ template<typename T>
 template<size_t A_rank, size_t A_size>
 T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 {
-	auto p = a_of.f_allocate(nullptr);
-	if (!p) {
-		v_wait();
-		p = a_of.f_allocate(this);
-	}
+	auto p = a_of.f_allocate(*this);
 	v_head<A_rank> = p->v_next;
 	return p;
 }

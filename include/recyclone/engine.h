@@ -440,7 +440,7 @@ size_t t_engine<T_type>::f_statistics()
 template<typename T_type>
 t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
 {
-	v_instance->f_wait();
+	v_instance->f_tick();
 }), v_options(a_options)
 {
 	v_instance = this;
