@@ -2,14 +2,20 @@ name: CMake
 on: [push]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cxx: g++-10
+          - os: windows-latest
     steps:
     - uses: actions/checkout@v2
     - name: Create Build Environment
       run: cmake -E make_directory ${{github.workspace}}/build
     - name: Configure CMake
       env:
-        CXX: g++-10
+        CXX: ${{matrix.cxx}}
       working-directory: ${{github.workspace}}/build
       run: cmake ${{github.workspace}} -DCMAKE_BUILD_TYPE=Debug
     - name: Build
@@ -17,4 +23,4 @@ jobs:
       run: cmake --build .
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest
+      run: ctest -C Debug

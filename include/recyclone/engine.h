@@ -4,7 +4,9 @@
 #include "thread.h"
 #include "extension.h"
 #include <deque>
+#ifdef __unix__
 #include <semaphore.h>
+#endif
 
 namespace recyclone
 {
@@ -76,10 +78,12 @@ protected:
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
+#ifdef __unix__
 	sem_t v_epoch__received;
 	sigset_t v_epoch__notsigusr2;
 	struct sigaction v_epoch__old_sigusr1;
 	struct sigaction v_epoch__old_sigusr2;
+#endif
 	t_thread<T_type>* v_thread__head = nullptr;
 	t_thread<T_type>* v_thread__main;
 	t_thread<T_type>* v_thread__finalizer = nullptr;
@@ -112,6 +116,7 @@ protected:
 		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type ? p : nullptr;
 	}
+#ifdef __unix__
 	void f_epoch_suspend()
 	{
 		if (sem_post(&v_epoch__received) == -1) _exit(errno);
@@ -123,6 +128,7 @@ protected:
 		pthread_kill(a_thread, a_signal);
 		while (sem_wait(&v_epoch__received) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
 	}
+#endif
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object<T_type>*));
 	size_t f_statistics();
@@ -444,6 +450,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 }), v_options(a_options)
 {
 	v_instance = this;
+#ifdef __unix__
 	if (sem_init(&v_epoch__received, 0, 0) == -1) throw std::system_error(errno, std::generic_category());
 	sigfillset(&v_epoch__notsigusr2);
 	sigdelset(&v_epoch__notsigusr2, SIGUSR2);
@@ -461,6 +468,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 	};
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
+#endif
 	v_thread__main = new t_thread<T_type>();
 	v_thread__main->f_initialize(this);
 	std::unique_lock lock(v_collector__conductor.v_mutex);
@@ -482,9 +490,11 @@ t_engine<T_type>::~t_engine()
 	f_wait();
 	v_collector__conductor.f_quit();
 	assert(!v_thread__head);
+#ifdef __unix__
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
+#endif
 	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {
 		std::map<T_type*, size_t> leaks;

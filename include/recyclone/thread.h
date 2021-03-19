@@ -5,8 +5,10 @@
 #include <thread>
 #include <csignal>
 #include <cstring>
+#ifdef __unix__
 #include <unistd.h>
 #include <sys/resource.h>
+#endif
 
 namespace recyclone
 {
@@ -17,6 +19,32 @@ class t_thread
 {
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
+
+	static size_t f_page()
+	{
+#ifdef __unix__
+		return sysconf(_SC_PAGESIZE);
+#endif
+#ifdef _WIN32
+		SYSTEM_INFO si;
+		GetSystemInfo(&si);
+		return si.dwAllocationGranularity;
+#endif
+	}
+	static size_t f_limit()
+	{
+#ifdef __unix__
+		rlimit limit;
+		if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
+		return limit.rlim_cur;
+#endif
+#ifdef _WIN32
+		ULONG_PTR low;
+		ULONG_PTR high;
+		GetCurrentThreadStackLimits(&low, &high);
+		return high - low;
+#endif
+	}
 
 	static inline RECYCLONE__THREAD t_thread* v_current;
 
@@ -32,10 +60,11 @@ class t_thread
 	int v_done = -1;
 	typename t_slot<T_type>::t_increments v_increments;
 	typename t_slot<T_type>::t_decrements v_decrements;
-#if WIN32
-	HANDLE v_handle;
-#else
+#ifdef __unix__
 	pthread_t v_handle;
+#endif
+#if _WIN32
+	HANDLE v_handle = NULL;
 #endif
 	std::unique_ptr<char[]> v_stack_buffer;
 	t_object<T_type>** v_stack_last_top;
@@ -53,6 +82,12 @@ class t_thread
 	 */
 	t_object<T_type>* volatile* v_reviving = nullptr;
 
+#if _WIN32
+	~t_thread()
+	{
+		if (v_handle != NULL) CloseHandle(v_handle);
+	}
+#endif
 	void f_initialize(void* a_bottom);
 	void f_epoch_get()
 	{
@@ -63,19 +98,26 @@ class t_thread
 	}
 	void f_epoch_suspend()
 	{
-#if WIN32
-		SuspendThread(v_handle);
-		f_epoch_get();
-#else
+#ifdef __unix__
 		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR1);
+#endif
+#if _WIN32
+		SuspendThread(v_handle);
+		CONTEXT context;
+		context.ContextFlags = CONTEXT_CONTROL;
+		GetThreadContext(v_handle, &context);
+		v_stack_top = reinterpret_cast<t_object<T_type>**>(context.Rsp);
+		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_relaxed);
+		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_relaxed);
 #endif
 	}
 	void f_epoch_resume()
 	{
-#if WIN32
-		ResumeThread(v_handle);
-#else
+#ifdef __unix__
 		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR2);
+#endif
+#if _WIN32
+		ResumeThread(v_handle);
 #endif
 	}
 	void f_epoch();
@@ -123,22 +165,21 @@ public:
 template<typename T_type>
 void t_thread<T_type>::f_initialize(void* a_bottom)
 {
-#if WIN32
-	v_handle = GetCurrentThread();
-#else
+#ifdef __unix__
 	v_handle = pthread_self();
 #endif
+#if _WIN32
+	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+#endif
 	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
-	auto page = sysconf(_SC_PAGESIZE);
-	rlimit limit;
-	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
-	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit.rlim_cur);
+	auto page = f_page();
+	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - f_limit());
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
-	t_slot<T_type>::t_increments::v_head = v_increments.v_objects;
+	v_increments.v_head = v_increments.v_objects;
 	t_slot<T_type>::t_increments::v_next = v_increments.v_objects + t_slot<T_type>::t_increments::V_SIZE / 8;
 	t_slot<T_type>::t_decrements::v_instance = &v_decrements;
-	t_slot<T_type>::t_decrements::v_head = v_decrements.v_objects;
+	v_decrements.v_head = v_decrements.v_objects;
 	t_slot<T_type>::t_decrements::v_next = v_decrements.v_objects + t_slot<T_type>::t_decrements::V_SIZE / 8;
 	v_done = 0;
 }
@@ -191,12 +232,11 @@ template<typename T_type>
 t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 {
 	if (f_engine<T_type>()->v_exiting) throw std::runtime_error("engine is exiting.");
-	rlimit limit;
-	if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
-	v_stack_buffer = std::make_unique<char[]>(limit.rlim_cur * 2);
-	auto p = v_stack_buffer.get() + limit.rlim_cur;
+	auto limit = f_limit();
+	v_stack_buffer = std::make_unique<char[]>(limit * 2);
+	auto p = v_stack_buffer.get() + limit;
 	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
-	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit.rlim_cur);
+	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
 	f_engine<T_type>()->v_thread__head = this;
 }
 

@@ -21,7 +21,7 @@ struct t_weak_pointers
 template<typename T_type>
 class t_weak_pointer : t_weak_pointers<T_type>
 {
-	friend class t_weak_pointers<T_type>;
+	friend struct t_weak_pointers<T_type>;
 	friend class t_extension<T_type>;
 
 	t_object<T_type>* v_target;

@@ -1,16 +1,20 @@
 cmake_minimum_required(VERSION 3.10)
 project(recyclone)
 
+find_package(Threads REQUIRED)
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-g CXX_COVERAGE)
+
 add_library(recyclone INTERFACE)
 target_compile_features(recyclone INTERFACE cxx_std_17)
 target_include_directories(recyclone INTERFACE include)
-target_link_libraries(recyclone INTERFACE pthread)
+target_link_libraries(recyclone INTERFACE Threads::Threads)
 
 enable_testing()
 function(do_test name)
 	add_executable(test_${name} test/test_${name}.cc)
-	target_compile_options(test_${name} PRIVATE "-g;--coverage")
-	target_link_libraries(test_${name} recyclone --coverage)
+	target_compile_options(test_${name} PRIVATE "$<$<BOOL:${CXX_COVERAGE}>:-g;--coverage>")
+	target_link_libraries(test_${name} recyclone "$<$<BOOL:${CXX_COVERAGE}>:--coverage>")
 	add_test(NAME ${name} COMMAND test_${name})
 	add_test(NAME ${name}-collect COMMAND test_${name} 0)
 endfunction()

@@ -6,7 +6,13 @@
 #include <map>
 #include <mutex>
 #include <new>
+#ifdef __unix__
 #include <sys/mman.h>
+#endif
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 namespace recyclone
 {
@@ -14,6 +20,25 @@ namespace recyclone
 template<typename T>
 class t_heap
 {
+	static void* f_map(size_t a_n)
+	{
+#ifdef __unix__
+		return mmap(NULL, a_n, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
+#ifdef _WIN32
+		return VirtualAlloc(NULL, a_n, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#endif
+	}
+	static void f_unmap(void* a_p, size_t a_n)
+	{
+#ifdef __unix__
+		munmap(a_p, a_n);
+#endif
+#ifdef _WIN32
+		VirtualFree(a_p, a_n, MEM_RELEASE);
+#endif
+	}
+
 	template<size_t A_rank, size_t A_size>
 	struct t_of
 	{
@@ -27,7 +52,7 @@ class t_heap
 		{
 			auto size = 128 << A_rank;
 			auto length = size * A_size;
-			auto block = static_cast<char*>(mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+			auto block = static_cast<char*>(f_map(length));
 			auto p = block;
 			for (size_t i = 1; i < A_size; ++i) {
 				auto q = new(p) T;
@@ -121,7 +146,7 @@ public:
 	}
 	~t_heap()
 	{
-		for (auto& x : v_blocks) munmap(x.first, x.second);
+		for (auto& x : v_blocks) f_unmap(x.first, x.second);
 	}
 	size_t f_live() const
 	{
@@ -194,7 +219,7 @@ public:
 			auto n = i->second;
 			v_blocks.erase(i);
 			v_mutex.unlock();
-			munmap(a_p, n);
+			f_unmap(a_p, n);
 			++v_freed;
 		}
 	}
@@ -213,7 +238,7 @@ public:
 			if (i == v_blocks.begin()) return nullptr;
 			--i;
 		}
-		auto j = static_cast<char*>(a_p) - reinterpret_cast<char*>(i->first);
+		size_t j = static_cast<char*>(a_p) - reinterpret_cast<char*>(i->first);
 		return j < i->second && (j & (128 << i->first->v_rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
 	}
 };
@@ -230,7 +255,7 @@ T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 template<typename T>
 T* t_heap<T>::f_allocate_large(size_t a_size)
 {
-	auto p = new(mmap(NULL, a_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) T;
+	auto p = new(f_map(a_size)) T;
 	p->v_rank = 57;
 	{
 		std::lock_guard lock(v_mutex);

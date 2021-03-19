@@ -29,7 +29,7 @@ struct t_type
 template<typename T>
 struct t_type_of : t_type
 {
-	static inline t_type_of v_instance;
+	static t_type_of v_instance;
 
 	t_type_of()
 	{
@@ -40,6 +40,9 @@ struct t_type_of : t_type
 		};
 	}
 };
+
+template<typename T>
+t_type_of<T> t_type_of<T>::v_instance;
 
 template<typename T, typename... T_an>
 T* f_new(T_an&&... a_n)

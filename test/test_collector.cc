@@ -49,21 +49,24 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = options.v_verify = true;
 	t_engine<t_type> engine(options);
-	auto towers = f_hanoi(
-		f_new<t_pair>(f_new<t_symbol>("a"sv),
-		f_new<t_pair>(f_new<t_symbol>("b"sv),
-		f_new<t_pair>(f_new<t_symbol>("c"sv),
-		f_new<t_pair>(f_new<t_symbol>("d"sv),
-		f_new<t_pair>(f_new<t_symbol>("e"sv)
-	))))), [](auto a_towers, auto a_from, auto a_to)
+	return engine.f_exit([&]
 	{
-		std::printf("%s\n", f_string(a_towers).c_str());
-		auto tower = static_cast<t_pair*>(f_get(a_towers, a_from));
-		return f_put(f_put(a_towers, a_from, tower->v_tail), a_to,
-			f_new<t_pair>(tower->v_head, f_get(a_towers, a_to))
-		);
-	});
-	std::printf("%s\n", f_string(towers).c_str());
-	assert(f_string(towers) == "(() () (a b c d e))");
-	return engine.f_exit(0);
+		auto towers = f_hanoi(
+			f_new<t_pair>(f_new<t_symbol>("a"sv),
+			f_new<t_pair>(f_new<t_symbol>("b"sv),
+			f_new<t_pair>(f_new<t_symbol>("c"sv),
+			f_new<t_pair>(f_new<t_symbol>("d"sv),
+			f_new<t_pair>(f_new<t_symbol>("e"sv)
+		))))), [](auto a_towers, auto a_from, auto a_to)
+		{
+			std::printf("%s\n", f_string(a_towers).c_str());
+			auto tower = static_cast<t_pair*>(f_get(a_towers, a_from));
+			return f_put(f_put(a_towers, a_from, tower->v_tail), a_to,
+				f_new<t_pair>(tower->v_head, f_get(a_towers, a_to))
+			);
+		});
+		std::printf("%s\n", f_string(towers).c_str());
+		assert(f_string(towers) == "(() () (a b c d e))");
+		return 0;
+	}());
 }

@@ -80,10 +80,13 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = options.v_verify = true;
 	t_engine<t_type> engine(options);
-	auto type_type = t_type_of<t_type>::f_initialize();
-	assert(type_type->f_type() == type_type);
-	auto type_pair = type_type->f_new<t_pair>();
-	assert(type_pair->f_type() == type_type);
-	assert(type_pair->f_new(type_pair->f_new(), type_pair->f_new())->f_type() == type_pair);
-	return engine.f_exit(0);
+	return engine.f_exit([]
+	{
+		auto type_type = t_type_of<t_type>::f_initialize();
+		assert(type_type->f_type() == type_type);
+		auto type_pair = type_type->f_new<t_pair>();
+		assert(type_pair->f_type() == type_type);
+		assert(type_pair->f_new(type_pair->f_new(), type_pair->f_new())->f_type() == type_pair);
+		return 0;
+	}());
 }
