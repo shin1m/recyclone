@@ -35,7 +35,7 @@ class t_heap
 		munmap(a_p, a_n);
 #endif
 #ifdef _WIN32
-		VirtualFree(a_p, a_n, MEM_RELEASE);
+		VirtualFree(a_p, 0, MEM_RELEASE);
 #endif
 	}
 

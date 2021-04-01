@@ -63,7 +63,7 @@ class t_thread
 #ifdef __unix__
 	pthread_t v_handle;
 #endif
-#if _WIN32
+#ifdef _WIN32
 	HANDLE v_handle = NULL;
 #endif
 	std::unique_ptr<char[]> v_stack_buffer;
@@ -82,7 +82,7 @@ class t_thread
 	 */
 	t_object<T_type>* volatile* v_reviving = nullptr;
 
-#if _WIN32
+#ifdef _WIN32
 	~t_thread()
 	{
 		if (v_handle != NULL) CloseHandle(v_handle);
@@ -101,12 +101,16 @@ class t_thread
 #ifdef __unix__
 		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR1);
 #endif
-#if _WIN32
+#ifdef _WIN32
 		SuspendThread(v_handle);
 		CONTEXT context;
 		context.ContextFlags = CONTEXT_CONTROL;
 		GetThreadContext(v_handle, &context);
-		v_stack_top = reinterpret_cast<t_object<T_type>**>(context.Rsp);
+		auto sp = reinterpret_cast<void*>(context.Rsp);
+		MEMORY_BASIC_INFORMATION mbi;
+		VirtualQuery(sp, &mbi, sizeof(mbi));
+		if (mbi.Protect & PAGE_GUARD) sp = static_cast<char*>(mbi.BaseAddress) + mbi.RegionSize;
+		v_stack_top = static_cast<t_object<T_type>**>(sp);
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_relaxed);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_relaxed);
 #endif
@@ -116,7 +120,7 @@ class t_thread
 #ifdef __unix__
 		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR2);
 #endif
-#if _WIN32
+#ifdef _WIN32
 		ResumeThread(v_handle);
 #endif
 	}
@@ -168,7 +172,7 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 #ifdef __unix__
 	v_handle = pthread_self();
 #endif
-#if _WIN32
+#ifdef _WIN32
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
 #endif
 	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);

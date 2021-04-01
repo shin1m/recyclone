@@ -28,7 +28,7 @@ class t_slot
 		static constexpr size_t V_SIZE = A_SIZE;
 
 		static inline RECYCLONE__THREAD t_queue* v_instance;
-#if _WIN32
+#ifdef _WIN32
 		t_object<T_type>* volatile* v_head;
 #else
 		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_head;
@@ -37,7 +37,7 @@ class t_slot
 
 		RECYCLONE__ALWAYS_INLINE static void f_push(t_object<T_type>* a_object)
 		{
-#if _WIN32
+#ifdef _WIN32
 			auto p = v_instance->v_head;
 #else
 			auto p = v_head;
@@ -46,7 +46,7 @@ class t_slot
 			if (p == v_next)
 				v_instance->f_next();
 			else
-#if _WIN32
+#ifdef _WIN32
 				[[likely]] v_instance->v_head = p + 1;
 #else
 				[[likely]] v_head = p + 1;
