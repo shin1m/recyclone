@@ -106,11 +106,17 @@ class t_thread
 		CONTEXT context;
 		context.ContextFlags = CONTEXT_CONTROL;
 		GetThreadContext(v_handle, &context);
-		auto sp = reinterpret_cast<void*>(context.Rsp);
+		v_stack_top = reinterpret_cast<t_object<T_type>**>(context.Rsp);
 		MEMORY_BASIC_INFORMATION mbi;
-		VirtualQuery(sp, &mbi, sizeof(mbi));
-		if (mbi.Protect & PAGE_GUARD) sp = static_cast<char*>(mbi.BaseAddress) + mbi.RegionSize;
-		v_stack_top = static_cast<t_object<T_type>**>(sp);
+		for (auto p = v_stack_top;;) {
+			VirtualQuery(p, &mbi, sizeof(mbi));
+			p = reinterpret_cast<t_object<T_type>**>(static_cast<char*>(mbi.BaseAddress) + mbi.RegionSize);
+			if (mbi.Protect & PAGE_GUARD) {
+				v_stack_top = p;
+				break;
+			}
+			if (p >= v_stack_bottom) break;
+		}
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_relaxed);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_relaxed);
 #endif
