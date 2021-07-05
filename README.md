@@ -94,11 +94,28 @@ Scanning blacks on every increment/decrement operation turned out to be expensiv
 
 The increment/decrement operations are changed to mark just only their target objects as black/purple respectively.
 
-## Cyclic Decrement
+## Refurbish
 
-There is a case in which the reference count of an orange object is decremented to zero by cyclic decrement, where a red object in a garbage cycle has the last reference to an orange object in the other candidate cycle.
+There is a case in which the reference count of an orange object is decremented to zero by the cyclic decrement, where a red object in a garbage cycle has the last reference to an orange object in the other candidate cycle.
 
-The cyclic decrement is changed to release the orange object in this case.
+Given the following candidate cycles:
+
+     -> C1 -> C0 -> *
+    |___|
+
+Where
+* They were found in the order of C0 and C1 by the find cycles.
+* C1 has the last references to the acyclic portion of C0.
+
+They are tested in the order of C1 and C0 by the free cycles.
+
+If C1 passed tests and decremented reference counts in C0,
+then C0 has objects with the reference count zero
+which must be released even if C0 failed tests.
+
+The refurbish is changed to buffer them as garbage.
+
+After the free cycles is completed, the buffered garbage objects are released.
 
 # License
 

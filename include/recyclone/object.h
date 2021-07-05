@@ -224,12 +224,12 @@ class t_object
 	void f_cyclic_decrement_push()
 	{
 		if (v_color == e_color__RED) return;
-		if (v_color != e_color__ORANGE)
-			f_decrement();
-		else if (--v_count > 0)
+		if (v_color == e_color__ORANGE) {
+			--v_count;
 			--v_cyclic;
-		else if (!v_finalizee || !f_queue_finalize())
-			f_loop<&t_object::f_decrement_step>();
+		} else {
+			f_decrement();
+		}
 	}
 	void f_cyclic_decrement()
 	{

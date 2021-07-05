@@ -248,20 +248,21 @@ void t_engine<T_type>::f_collector()
 				}
 			}
 		}
+		t_object<T_type>* garbage = nullptr;
 		while (v_cycles) {
 			std::lock_guard lock(v_object__reviving__mutex);
 			auto cycle = v_cycles;
 			v_cycles = cycle->v_next_cycle;
-			auto mutated = false;
+			auto failed = false;
 			auto finalizee = false;
 			auto p = cycle;
 			while (true) {
 				auto q = p->v_next;
 				if (q->v_type) {
 					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0)
-						mutated = true;
+						failed = true;
 					else if (v_object__reviving)
-					       if (auto p = q->v_extension.load(std::memory_order_relaxed)) if (p->v_weak_pointers__cycle) mutated = true;
+					       if (auto p = q->v_extension.load(std::memory_order_relaxed)) if (p->v_weak_pointers__cycle) failed = true;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
 					if (p == cycle) break;
@@ -275,12 +276,15 @@ void t_engine<T_type>::f_collector()
 				}
 			}
 			if (!cycle) continue;
-			if (mutated) {
+			if (failed) {
 				p = cycle;
 				if (p->v_color == e_color__ORANGE) p->v_color = e_color__PURPLE;
 				do {
 					auto q = p->v_next;
-					if (p->v_color == e_color__PURPLE) {
+					if (p->v_count <= 0) {
+						p->v_next = garbage;
+						garbage = p;
+					} else if (p->v_color == e_color__PURPLE) {
 						t_object<T_type>::f_append(p);
 					} else {
 						p->v_color = e_color__BLACK;
@@ -320,6 +324,12 @@ void t_engine<T_type>::f_collector()
 					} while (p != cycle);
 				}
 			}
+		}
+		while (garbage) {
+			auto p = garbage;
+			garbage = p->v_next;
+			p->v_next = nullptr;
+			if (!p->v_finalizee || !p->f_queue_finalize()) p->template f_loop<&t_object<T_type>::f_decrement_step>();
 		}
 		auto roots = reinterpret_cast<t_object<T_type>*>(&t_object<T_type>::v_roots);
 		if (roots->v_next != roots) {
