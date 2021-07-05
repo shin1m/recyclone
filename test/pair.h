@@ -2,6 +2,7 @@
 #define TEST__PAIR_H
 
 #include "type.h"
+#include <string>
 
 using namespace std::literals;
 
