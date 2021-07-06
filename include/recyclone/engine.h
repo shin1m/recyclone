@@ -356,10 +356,7 @@ void t_engine<T_type>::f_collector()
 				if (roots->v_next != roots) {
 					{
 						auto p = roots->v_next;
-						do {
-							p->f_scan_gray();
-							p = p->v_next;
-						} while (p != roots);
+						do p->f_scan_gray(); while ((p = p->v_next) != roots);
 					}
 					do {
 						auto p = roots->v_next;
