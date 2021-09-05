@@ -126,7 +126,7 @@ class t_object
 			v_extension.store(nullptr, std::memory_order_relaxed);
 			delete p;
 		}
-		v_type->f_scan(this, f_push_and_clear<&t_object::f_decrement_push>);
+		v_type->f_finalize(this, f_push_and_clear<&t_object::f_decrement_push>);
 		v_type->f_decrement_push();
 		v_type = nullptr;
 		v_color = e_color__BLACK;
@@ -238,7 +238,7 @@ class t_object
 			v_extension.store(nullptr, std::memory_order_relaxed);
 			delete p;
 		}
-		v_type->f_scan(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+		v_type->f_finalize(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
 		v_type->f_cyclic_decrement_push();
 		v_type = nullptr;
 	}

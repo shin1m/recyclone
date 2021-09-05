@@ -7,6 +7,12 @@ struct t_type : t_object<t_type>
 {
 	//! Called by the collector to scan object members.
 	void (*f_scan)(t_object<t_type>*, t_scan<t_type>);
+	//! Called by the collector to finalize this.
+	/*!
+	  It is necessary to scan object members as in f_scan.
+	  This is where to destruct native part.
+	 */
+	void (*f_finalize)(t_object<t_type>*, t_scan<t_type>);
 };
 
 template<typename T>
@@ -30,7 +36,7 @@ struct t_type_of<t_type> : t_type
 	static t_type_of* f_initialize()
 	{
 		auto p = static_cast<t_type_of*>(f_engine<t_type>()->f_allocate(sizeof(t_type_of)));
-		p->f_scan = [](auto, auto)
+		p->f_scan = p->f_finalize = [](auto, auto)
 		{
 		};
 		// t_type_of<t_type> is also an instance of t_type_of<t_type>.
@@ -48,6 +54,13 @@ struct t_type_of<t_type> : t_type
 			// Just delegates to a_this.
 			static_cast<T*>(a_this)->f_scan(a_scan);
 		};
+		p->f_finalize = [](auto a_this, auto a_scan)
+		{
+			// Just delegates to a_this.
+			auto p = static_cast<T*>(a_this);
+			p->f_scan(a_scan);
+			p->f_destruct();
+		};
 		// t_type_of<T> is an instance of t_type_of<t_type>.
 		p->f_be(this);
 		return p;
@@ -62,15 +75,19 @@ struct t_pair : t_object<t_type>
 	//! Called by t_type_of<t_pair>::f_new(...).
 	void f_construct(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr)
 	{
-		// Members have not been initialized yet at this point.
+		// Members have not been constructed yet at this point.
 		new(&v_head) decltype(v_head)(a_head);
 		new(&v_tail) decltype(v_tail)(a_tail);
 	}
-	//! Called by t_typeof<t_pair>::f_scan(...).
+	//! Called by t_type_of<t_pair>::f_scan(...).
 	void f_scan(t_scan<t_type> a_scan)
 	{
 		a_scan(v_head);
 		a_scan(v_tail);
+	}
+	//! Called by t_type_of<t_pair>::f_finalize(...).
+	void f_destruct()
+	{
 	}
 };
 

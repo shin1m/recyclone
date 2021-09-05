@@ -10,6 +10,12 @@ struct t_type
 {
 	//! Called by the collector to scan object members.
 	void (*f_scan)(t_object<t_type>*, t_scan<t_type>);
+	//! Called by the collector to finalize this.
+	/*!
+	  It is necessary to scan object members as in f_scan.
+	  This is where to destruct native part.
+	 */
+	void (*f_finalize)(t_object<t_type>*, t_scan<t_type>);
 	// Below are dummy implementations to skip scanning.
 	template<void (t_object<t_type>::*A_push)()>
 	void f_push()
@@ -37,6 +43,13 @@ struct t_type_of : t_type
 		{
 			// Just delegates to a_this.
 			static_cast<T*>(a_this)->f_scan(a_scan);
+		};
+		f_finalize = [](auto a_this, auto a_scan)
+		{
+			// Just delegates to a_this.
+			auto p = static_cast<T*>(a_this);
+			p->f_scan(a_scan);
+			p->f_destruct();
 		};
 	}
 };

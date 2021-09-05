@@ -15,8 +15,12 @@ struct t_thread : t_object<t_type>
 	{
 		v_background = a_background;
 	}
-	//! Called by t_typeof<t_thread>::f_scan(...).
+	//! Called by t_type_of<t_thread>::f_scan(...).
 	void f_scan(t_scan<t_type>)
+	{
+	}
+	//! Called by t_type_of<t_thread>::f_finalize(...).
+	void f_destruct()
 	{
 	}
 	//! Called by recyclone::t_engine::f_start(...) on a new thread
