@@ -11,21 +11,29 @@ int main(int argc, char* argv[])
 	options.v_verbose = options.v_verify = true;
 	t_engine_with_finalizer engine(options, [](auto a_p)
 	{
+		f_epoch_point<t_type>();
 		if (a_p->f_type() != &t_type_of<t_pair>::v_instance) return;
-		std::printf("%s -> ", f_string(a_p).c_str());
+		auto s = f_string(a_p);
+		{
+			t_epoch_region<t_type> region;
+			std::printf("%s -> ", s.c_str());
+		}
 		auto p = static_cast<t_pair*>(a_p);
 		if (p->v_head && p->v_head->f_type() == &t_type_of<t_symbol>::v_instance && static_cast<t_symbol*>(p->v_head)->v_name == "resurrected"sv) {
 			++v_finalized;
+			t_epoch_region<t_type> region;
 			std::printf("finalized\n");
 		} else {
 			p->v_head = f_new<t_symbol>("resurrected"sv);
 			v_resurrected = p;
 			p->f_finalizee__(true);
+			t_epoch_region<t_type> region;
 			std::printf("resurrected\n");
 		}
 	});
 	f_padding([]
 	{
+		f_epoch_point<t_type>();
 		auto p = f_new<t_pair>(f_new<t_symbol>("foo"sv));
 		p->f_finalizee__(true);
 	});
@@ -33,13 +41,21 @@ int main(int argc, char* argv[])
 	engine.f_finalize();
 	f_padding([]
 	{
-		std::printf("resurrected: %s\n", f_string(v_resurrected).c_str());
+		f_epoch_point<t_type>();
+		auto s = f_string(v_resurrected);
+		{
+			t_epoch_region<t_type> region;
+			std::printf("resurrected: %s\n", s.c_str());
+		}
 		assert(v_resurrected);
 		v_resurrected = nullptr;
 	});
 	engine.f_collect();
 	engine.f_finalize();
-	std::printf("finalized: %zu\n", v_finalized);
+	{
+		t_epoch_region<t_type> region;
+		std::printf("finalized: %zu\n", v_finalized);
+	}
 	assert(v_finalized == 1);
 	return engine.f_exit(0);
 }

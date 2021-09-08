@@ -21,6 +21,7 @@ struct t_type_of : t_type
 	template<typename... T_an>
 	T* f_new(T_an&&... a_n)
 	{
+		f_epoch_point<t_type>();
 		auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
 		p->f_construct(std::forward<T_an>(a_n)...);
 		// Finishes object construction.
@@ -35,6 +36,7 @@ struct t_type_of<t_type> : t_type
 	//! Constructs t_type_of<t_type>.
 	static t_type_of* f_initialize()
 	{
+		f_epoch_point<t_type>();
 		auto p = static_cast<t_type_of*>(f_engine<t_type>()->f_allocate(sizeof(t_type_of)));
 		p->f_scan = p->f_finalize = [](auto, auto)
 		{
@@ -48,6 +50,7 @@ struct t_type_of<t_type> : t_type
 	template<typename T>
 	t_type_of<T>* f_new()
 	{
+		f_epoch_point<t_type>();
 		auto p = static_cast<t_type_of<T>*>(f_engine<t_type>()->f_allocate(sizeof(t_type_of<T>)));
 		p->f_scan = [](auto a_this, auto a_scan)
 		{
@@ -75,6 +78,7 @@ struct t_pair : t_object<t_type>
 	//! Called by t_type_of<t_pair>::f_new(...).
 	void f_construct(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr)
 	{
+		f_epoch_point<t_type>();
 		// Members have not been constructed yet at this point.
 		new(&v_head) decltype(v_head)(a_head);
 		new(&v_tail) decltype(v_tail)(a_tail);
@@ -99,6 +103,7 @@ int main(int argc, char* argv[])
 	t_engine<t_type> engine(options);
 	return engine.f_exit([]
 	{
+		f_epoch_point<t_type>();
 		auto type_type = t_type_of<t_type>::f_initialize();
 		assert(type_type->f_type() == type_type);
 		auto type_pair = type_type->f_new<t_pair>();

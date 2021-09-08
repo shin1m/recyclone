@@ -22,6 +22,7 @@ t_pair* f_hanoi(t_pair* a_tower, T_move a_move)
 {
 	return t_fix([&](auto step, t_pair* a_height, t_pair* a_towers, size_t a_from, size_t a_via, size_t a_to) -> t_pair*
 	{
+		f_epoch_point<t_type>();
 		return a_height
 			? step(static_cast<t_pair*>(a_height->v_tail), a_move(
 				step(static_cast<t_pair*>(a_height->v_tail), a_towers, a_from, a_to, a_via),
@@ -38,6 +39,7 @@ t_object<t_type>* f_get(t_pair* a_xs, size_t a_i)
 
 t_pair* f_put(t_pair* a_xs, size_t a_i, t_object<t_type>* a_x)
 {
+	f_epoch_point<t_type>();
 	return a_i > 0
 		? f_new<t_pair>(a_xs->v_head, f_put(static_cast<t_pair*>(a_xs->v_tail), a_i - 1, a_x))
 		: f_new<t_pair>(a_x, a_xs->v_tail);
@@ -51,6 +53,7 @@ int main(int argc, char* argv[])
 	t_engine<t_type> engine(options);
 	return engine.f_exit([&]
 	{
+		f_epoch_point<t_type>();
 		auto towers = f_hanoi(
 			f_new<t_pair>(f_new<t_symbol>("a"sv),
 			f_new<t_pair>(f_new<t_symbol>("b"sv),
@@ -59,14 +62,23 @@ int main(int argc, char* argv[])
 			f_new<t_pair>(f_new<t_symbol>("e"sv)
 		))))), [](auto a_towers, auto a_from, auto a_to)
 		{
-			std::printf("%s\n", f_string(a_towers).c_str());
+			f_epoch_point<t_type>();
+			auto s = f_string(a_towers);
+			{
+				t_epoch_region<t_type> region;
+				std::printf("%s\n", s.c_str());
+			}
 			auto tower = static_cast<t_pair*>(f_get(a_towers, a_from));
 			return f_put(f_put(a_towers, a_from, tower->v_tail), a_to,
 				f_new<t_pair>(tower->v_head, f_get(a_towers, a_to))
 			);
 		});
-		std::printf("%s\n", f_string(towers).c_str());
-		assert(f_string(towers) == "(() () (a b c d e))");
+		auto s = f_string(towers);
+		{
+			t_epoch_region<t_type> region;
+			std::printf("%s\n", s.c_str());
+		}
+		assert(s == "(() () (a b c d e))");
 		return 0;
 	}());
 }

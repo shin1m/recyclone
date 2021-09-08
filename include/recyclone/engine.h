@@ -4,8 +4,10 @@
 #include "thread.h"
 #include "extension.h"
 #include <deque>
+#ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 #include <semaphore.h>
+#endif
 #endif
 
 namespace recyclone
@@ -78,11 +80,13 @@ protected:
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
+#ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	sem_t v_epoch__received;
 	sigset_t v_epoch__notsigusr2;
 	struct sigaction v_epoch__old_sigusr1;
 	struct sigaction v_epoch__old_sigusr2;
+#endif
 #endif
 	t_thread<T_type>* v_thread__head = nullptr;
 	t_thread<T_type>* v_thread__main;
@@ -116,6 +120,7 @@ protected:
 		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type ? p : nullptr;
 	}
+#ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	void f_epoch_suspend()
 	{
@@ -128,6 +133,7 @@ protected:
 		pthread_kill(a_thread, a_signal);
 		while (sem_wait(&v_epoch__received) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
 	}
+#endif
 #endif
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object<T_type>*));
@@ -169,7 +175,16 @@ public:
 		v_collector__conductor.f_wake();
 	}
 	//! Triggers garbage collection and waits for it to finish.
+#ifdef RECYCLONE__COOPERATIVE
 	void f_wait()
+	{
+		t_epoch_region<T_type> region;
+		f__wait();
+	}
+	void f__wait()
+#else
+	void f_wait()
+#endif
 	{
 		std::unique_lock lock(v_collector__conductor.v_mutex);
 		++v_collector__wait;
@@ -389,15 +404,18 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
 	while (true) {
 		{
+			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = true;
 		}
 		{
+			t_epoch_region<T_type> region;
 			std::unique_lock lock(v_finalizer__conductor.v_mutex);
 			if (v_finalizer__conductor.v_quitting) break;
 			v_finalizer__conductor.f_next(lock);
 		}
 		{
+			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = false;
 			v_finalizer__awaken = 2;
@@ -457,6 +475,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 }), v_options(a_options)
 {
 	v_instance = this;
+#ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	if (sem_init(&v_epoch__received, 0, 0) == -1) throw std::system_error(errno, std::generic_category());
 	sigfillset(&v_epoch__notsigusr2);
@@ -476,6 +495,7 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 	sigaddset(&sa.sa_mask, SIGUSR2);
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
 #endif
+#endif
 	v_thread__main = new t_thread<T_type>();
 	v_thread__main->f_initialize(this);
 	std::unique_lock lock(v_collector__conductor.v_mutex);
@@ -487,20 +507,33 @@ template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
 	{
+#ifdef RECYCLONE__COOPERATIVE
+		v_thread__main->f_epoch_enter();
+#else
 		v_thread__main->f_epoch_get();
+#endif
 		std::lock_guard lock(v_thread__mutex);
 		++v_thread__main->v_done;
 	}
+#ifdef RECYCLONE__COOPERATIVE
+	f__wait();
+	f__wait();
+	f__wait();
+	f__wait();
+#else
 	f_wait();
 	f_wait();
 	f_wait();
 	f_wait();
+#endif
 	v_collector__conductor.f_quit();
 	assert(!v_thread__head);
+#ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
+#endif
 #endif
 	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {
@@ -526,6 +559,7 @@ template<typename T_type>
 int t_engine<T_type>::f_exit(int a_code)
 {
 	{
+		t_epoch_region<T_type> region;
 		std::unique_lock lock(v_thread__mutex);
 		auto tail = v_thread__finalizer ? v_thread__finalizer : v_thread__main;
 		while (true) {
@@ -548,6 +582,7 @@ int t_engine<T_type>::f_exit(int a_code)
 		f_wait();
 		f_wait();
 		assert(v_thread__head == v_thread__finalizer);
+		t_epoch_region<T_type> region;
 		v_finalizer__conductor.f_quit();
 		std::unique_lock lock(v_thread__mutex);
 		while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
@@ -578,6 +613,7 @@ void t_engine<T_type>::f_collect()
 template<typename T_type>
 void t_engine<T_type>::f_finalize()
 {
+	t_epoch_region<T_type> region;
 	std::unique_lock lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f_wake();
 	v_finalizer__conductor.f_wait(lock);
@@ -588,6 +624,7 @@ template<typename T_thread, typename T_main>
 void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 {
 	{
+		t_epoch_region<T_type> region;
 		std::lock_guard lock(v_thread__mutex);
 		if (a_thread->v_internal) throw std::runtime_error("already started.");
 		a_thread->v_internal = new t_thread<T_type>();
@@ -610,18 +647,24 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 			}
 			v_object__heap.f_return();
 			{
+				t_epoch_region<T_type> region;
 				std::lock_guard lock(v_thread__mutex);
 				internal->v_background = false;
 				a_thread->v_internal = nullptr;
 			}
 			t_slot<T_type>::t_decrements::f_push(a_thread);
+#ifdef RECYCLONE__COOPERATIVE
+			internal->f_epoch_enter();
+#else
 			internal->f_epoch_get();
+#endif
 			std::lock_guard lock(v_thread__mutex);
 			++internal->v_done;
 			v_thread__condition.notify_all();
 		}).detach();
 	} catch (...) {
 		{
+			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			a_thread->v_internal->v_done = 1;
 			a_thread->v_internal = nullptr;
@@ -638,6 +681,7 @@ void t_engine<T_type>::f_join(T_thread* a_thread)
 {
 	if (a_thread->v_internal == t_thread<T_type>::v_current) throw std::runtime_error("current thread can not be joined.");
 	if (a_thread->v_internal == v_thread__main) throw std::runtime_error("engine thread can not be joined.");
+	t_epoch_region<T_type> region;
 	std::unique_lock lock(v_thread__mutex);
 	while (a_thread->v_internal) v_thread__condition.wait(lock);
 }

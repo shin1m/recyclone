@@ -8,6 +8,7 @@ int main(int argc, char* argv[])
 	t_engine<t_type> engine(options);
 	return engine.f_exit([]
 	{
+		f_epoch_point<t_type>();
 		auto p = f_new<t_pair>();
 		auto q = f_new<t_pair>(p);
 		p->v_tail = q;

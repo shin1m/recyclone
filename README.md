@@ -4,8 +4,6 @@ Recyclone is a C++ implementation of a modified version of David F. Bacon's [Rec
 
 It requires C++17 or later.
 
-Currently, it is built and tested only by using GCC 10.x on Linux x86-64.
-
 # Features
 
 * Concurrent garbage collector
@@ -28,6 +26,16 @@ Currently, it is built and tested only by using GCC 10.x on Linux x86-64.
 * High memory overhead - each object has at least 64 bytes of overhead.
 * No compaction
 * No drop-in replacement for new & delete
+
+# Thread Suspension Modes
+
+## Preemptive Suspension
+
+This mode uses SIGUSR1 & SIGUSR2 or SuspendThread().
+
+## Cooperative Suspension
+
+This mode uses epoch points and epoch regions which does not require signals.
 
 # How to
 
@@ -52,6 +60,10 @@ See [test/test_monitor.cc](test/test_monitor.cc).
 ## Use Weak Pointers
 
 See [test/test_weak_pointer.cc](test/test_weak_pointer.cc).
+
+## Use Cooperative Suspension
+
+Define preprocessor symbol `RECYCLONE__COOPERATIVE`.
 
 # Differences from Recycler
 

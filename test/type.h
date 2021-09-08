@@ -60,6 +60,7 @@ t_type_of<T> t_type_of<T>::v_instance;
 template<typename T, typename... T_an>
 T* f_new(T_an&&... a_n)
 {
+	f_epoch_point<t_type>();
 	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
 	p->f_construct(std::forward<T_an>(a_n)...);
 	// Finishes object construction.

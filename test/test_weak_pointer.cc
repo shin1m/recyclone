@@ -10,6 +10,7 @@ int main(int argc, char* argv[])
 	options.v_verbose = options.v_verify = true;
 	t_engine_with_finalizer engine(options, [](auto a_p)
 	{
+		f_epoch_point<t_type>();
 		if (a_p->f_type() != &t_type_of<t_symbol>::v_instance) return;
 		auto p = static_cast<t_symbol*>(a_p);
 		if (static_cast<t_symbol*>(p)->v_name == "resurrected"sv) return;
@@ -20,6 +21,7 @@ int main(int argc, char* argv[])
 	std::unique_ptr<t_weak_pointer<t_type>> w;
 	f_padding([&]
 	{
+		f_epoch_point<t_type>();
 		auto x = f_new<t_symbol>("foo"sv);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, false);
 		assert(w->f_target() == x);
@@ -28,6 +30,7 @@ int main(int argc, char* argv[])
 	assert(w->f_target() == nullptr);
 	f_padding([&]
 	{
+		f_epoch_point<t_type>();
 		auto x = f_new<t_symbol>("bar"sv);
 		x->f_finalizee__(true);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
@@ -37,6 +40,7 @@ int main(int argc, char* argv[])
 	engine.f_finalize();
 	f_padding([&]
 	{
+		f_epoch_point<t_type>();
 		assert(w->f_target() != nullptr);
 	});
 	v_resurrected = nullptr;
@@ -46,6 +50,7 @@ int main(int argc, char* argv[])
 	assert(w->f_target() == nullptr);
 	f_padding([&]
 	{
+		f_epoch_point<t_type>();
 		auto x = f_new<t_symbol>("foo"sv);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
 		auto y = f_new<t_symbol>("bar"sv);

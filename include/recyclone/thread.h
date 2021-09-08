@@ -2,8 +2,13 @@
 #define RECYCLONE__THREAD_H
 
 #include "object.h"
+#ifdef RECYCLONE__COOPERATIVE
+#include <condition_variable>
+#endif
 #include <thread>
+#ifndef RECYCLONE__COOPERATIVE
 #include <csignal>
+#endif
 #include <cstring>
 #ifdef __unix__
 #include <unistd.h>
@@ -13,12 +18,19 @@
 namespace recyclone
 {
 
+template<typename T_type>
+void f_epoch_point();
+template<typename T_type>
+struct t_epoch_region;
+
 //! A set of thread data for garbage collection.
 template<typename T_type>
 class t_thread
 {
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
+	friend void recyclone::f_epoch_point<T_type>();
+	friend struct t_epoch_region<T_type>;
 
 	static size_t f_page()
 	{
@@ -60,6 +72,23 @@ class t_thread
 	int v_done = -1;
 	typename t_slot<T_type>::t_increments v_increments;
 	typename t_slot<T_type>::t_decrements v_decrements;
+#ifdef RECYCLONE__COOPERATIVE
+	/*!
+	  Epoch suspension status and poll function for epoch point:
+	    - f_epoch_off: no suspension is requested.
+	    - f_epoch_on: suspension is requested or the thread is in epoch region.
+	    - nullptr: suspension is in progress.
+	 */
+	std::atomic<void(*)()> v_epoch__poll = f_epoch_off;
+	/*!
+	  Place of suspension:
+	    - f_epoch_off: epoch point
+	    - f_epoch_on: epoch region
+	 */
+	void(*v_epoch__at)();
+	std::mutex v_epoch__mutex;
+	std::condition_variable v_epoch__done;
+#endif
 #ifdef __unix__
 	pthread_t v_handle;
 #endif
@@ -96,6 +125,44 @@ class t_thread
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_release);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
+#ifdef RECYCLONE__COOPERATIVE
+	static void f_epoch_off()
+	{
+	}
+	void f_epoch_sleep()
+	{
+		std::unique_lock lock(v_epoch__mutex);
+		v_epoch__poll.store(nullptr, std::memory_order_release);
+		v_epoch__done.notify_one();
+		do v_epoch__done.wait(lock); while (!v_epoch__poll.load(std::memory_order_relaxed));
+	}
+	static void f_epoch_on()
+	{
+		v_current->f_epoch_get();
+		v_current->f_epoch_sleep();
+	}
+	void f_epoch_enter();
+	void f_epoch_leave();
+	void f_epoch_suspend()
+	{
+		std::unique_lock lock(v_epoch__mutex);
+		while (true) {
+			v_epoch__at = f_epoch_off;
+			if (v_epoch__poll.compare_exchange_strong(v_epoch__at, f_epoch_on, std::memory_order_relaxed, std::memory_order_relaxed)) {
+				do v_epoch__done.wait(lock); while (v_epoch__poll.load(std::memory_order_acquire));
+				break;
+			}
+			v_epoch__at = f_epoch_on;
+			if (v_epoch__poll.compare_exchange_strong(v_epoch__at, nullptr, std::memory_order_acquire, std::memory_order_relaxed)) break;
+		}
+	}
+	void f_epoch_resume()
+	{
+		std::unique_lock lock(v_epoch__mutex);
+		v_epoch__poll.store(v_epoch__at, std::memory_order_relaxed);
+		v_epoch__done.notify_one();
+	}
+#else
 	void f_epoch_suspend()
 	{
 #ifdef __unix__
@@ -130,6 +197,7 @@ class t_thread
 		ResumeThread(v_handle);
 #endif
 	}
+#endif
 	void f_epoch();
 	void f_revive()
 	{
@@ -249,6 +317,68 @@ t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
 	f_engine<T_type>()->v_thread__head = this;
 }
+
+#ifdef RECYCLONE__COOPERATIVE
+template<typename T_type>
+void t_thread<T_type>::f_epoch_enter()
+{
+	f_epoch_get();
+	while (true) {
+		auto p = f_epoch_off;
+		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_on, std::memory_order_release, std::memory_order_relaxed)) break;
+		f_epoch_sleep();
+	}
+}
+
+template<typename T_type>
+void t_thread<T_type>::f_epoch_leave()
+{
+	auto p = f_epoch_on;
+	if (v_epoch__poll.compare_exchange_strong(p, f_epoch_off, std::memory_order_relaxed, std::memory_order_relaxed)) return;
+	std::unique_lock lock(v_epoch__mutex);
+	while (true) {
+		auto p = f_epoch_on;
+		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_off, std::memory_order_relaxed, std::memory_order_relaxed)) break;
+		v_epoch__done.wait(lock);
+	}
+}
+#endif
+
+//! Polls epoch suspension request.
+/*!
+  This should be called periodically in order for GC to keep working.
+  Example places:
+    - Beginnings of functions.
+    - Back edges of loops.
+    - Catch handlers.
+ */
+template<typename T_type>
+inline void f_epoch_point()
+{
+#ifdef RECYCLONE__COOPERATIVE
+	t_thread<T_type>::v_current->v_epoch__poll.load(std::memory_order_relaxed)();
+#endif
+}
+
+//! Establishes a region where epoch suspension is allowed.
+/*!
+  For each blocking operation, this should be placed at the closest scope surrounding it.
+  The object graph must not be manipulated within the region.
+ */
+template<typename T_type>
+struct t_epoch_region
+{
+#ifdef RECYCLONE__COOPERATIVE
+	t_epoch_region()
+	{
+		t_thread<T_type>::v_current->f_epoch_enter();
+	}
+	~t_epoch_region()
+	{
+		t_thread<T_type>::v_current->f_epoch_leave();
+	}
+#endif
+};
 
 }
 

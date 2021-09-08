@@ -14,6 +14,7 @@ struct t_pair : t_object<t_type>
 	//! Called by f_new<t_pair>(...).
 	void f_construct(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr)
 	{
+		f_epoch_point<t_type>();
 		// Members have not been constructed yet at this point.
 		new(&v_head) decltype(v_head)(a_head);
 		new(&v_tail) decltype(v_tail)(a_tail);
@@ -37,6 +38,7 @@ struct t_symbol : t_object<t_type>
 	//! Called by f_new<t_symbol>(...).
 	void f_construct(std::string_view a_name)
 	{
+		f_epoch_point<t_type>();
 		// Members have not been constructed yet at this point.
 		new(&v_name) decltype(v_name)(a_name);
 	}
@@ -55,6 +57,7 @@ struct t_symbol : t_object<t_type>
 
 inline std::string f_string(t_object<t_type>* a_value)
 {
+	f_epoch_point<t_type>();
 	if (!a_value) return "()";
 	if (a_value->f_type() == &t_type_of<t_pair>::v_instance)
 		for (auto s = "("s;; s += ' ') {
@@ -63,6 +66,7 @@ inline std::string f_string(t_object<t_type>* a_value)
 			a_value = p->v_tail;
 			if (!a_value) return s + ')';
 			if (a_value->f_type() != &t_type_of<t_pair>::v_instance) return s + " . " + f_string(a_value) + ')';
+			f_epoch_point<t_type>();
 		}
 	if (a_value->f_type() == &t_type_of<t_symbol>::v_instance) return static_cast<t_symbol*>(a_value)->v_name;
 	throw std::runtime_error("unknown type");

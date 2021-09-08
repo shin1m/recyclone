@@ -53,6 +53,7 @@ struct t_engine_with_finalizer : t_engine_with_threads
 		{
 			f_finalizer(a_finalize);
 		})->v_internal;
+		t_epoch_region<t_type> region;
 		v_finalizer__conductor.f_wait(lock);
 	}
 };
