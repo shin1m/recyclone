@@ -126,11 +126,9 @@ protected:
 	{
 		if (sem_post(&v_epoch__received) == -1) _exit(errno);
 		sigsuspend(&v_epoch__notsigusr2);
-		if (sem_post(&v_epoch__received) == -1) _exit(errno);
 	}
-	void f_epoch_send(pthread_t a_thread, int a_signal)
+	void f_epoch_wait()
 	{
-		pthread_kill(a_thread, a_signal);
 		while (sem_wait(&v_epoch__received) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
 	}
 #endif

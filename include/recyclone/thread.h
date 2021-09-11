@@ -166,7 +166,8 @@ class t_thread
 	void f_epoch_suspend()
 	{
 #ifdef __unix__
-		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR1);
+		pthread_kill(v_handle, SIGUSR1);
+		f_engine<T_type>()->f_epoch_wait();
 #endif
 #ifdef _WIN32
 		SuspendThread(v_handle);
@@ -191,7 +192,7 @@ class t_thread
 	void f_epoch_resume()
 	{
 #ifdef __unix__
-		f_engine<T_type>()->f_epoch_send(v_handle, SIGUSR2);
+		pthread_kill(v_handle, SIGUSR2);
 #endif
 #ifdef _WIN32
 		ResumeThread(v_handle);
