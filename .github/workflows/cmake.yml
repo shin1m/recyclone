@@ -8,6 +8,8 @@ jobs:
         include:
           - os: ubuntu-latest
             cxx: g++-10
+          - os: ubuntu-latest
+            cxx: clang++-12
           - os: windows-latest
     steps:
     - uses: actions/checkout@v2
