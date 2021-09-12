@@ -45,6 +45,9 @@ class t_thread
 	}
 	static size_t f_limit()
 	{
+#ifdef RECYCLONE__STACK_LIMIT
+		return RECYCLONE__STACK_LIMIT;
+#else
 #ifdef __unix__
 		rlimit limit;
 		if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
@@ -55,6 +58,7 @@ class t_thread
 		ULONG_PTR high;
 		GetCurrentThreadStackLimits(&low, &high);
 		return high - low;
+#endif
 #endif
 	}
 
