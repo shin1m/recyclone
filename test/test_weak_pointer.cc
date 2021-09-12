@@ -42,8 +42,8 @@ int main(int argc, char* argv[])
 	{
 		f_epoch_point<t_type>();
 		assert(w->f_target() != nullptr);
+		v_resurrected = nullptr;
 	});
-	v_resurrected = nullptr;
 	engine.f_collect();
 	engine.f_finalize();
 	engine.f_collect();
