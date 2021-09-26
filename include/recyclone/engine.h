@@ -579,6 +579,7 @@ int t_engine<T_type>::f_exit(int a_code)
 		f_wait();
 		f_wait();
 		f_wait();
+		f_finalize();
 		assert(v_thread__head == v_thread__finalizer);
 		t_epoch_region<T_type> region;
 		v_finalizer__conductor.f_quit();
