@@ -25,12 +25,13 @@ class t_weak_pointer : t_weak_pointers<T_type>
 	friend class t_extension<T_type>;
 
 	t_object<T_type>* v_target;
-	bool v_final;
 
 	void f_attach(t_root<t_slot<T_type>>& a_target);
 	t_object<T_type>* f_detach();
 
 public:
+	const bool v_final;
+
 	t_weak_pointer(t_object<T_type>* a_target, bool a_final);
 	~t_weak_pointer();
 	t_object<T_type>* f_target() const;
