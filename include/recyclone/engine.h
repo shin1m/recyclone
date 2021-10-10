@@ -616,6 +616,8 @@ void t_engine<T_type>::f_finalize()
 	std::unique_lock lock(v_finalizer__conductor.v_mutex);
 	v_finalizer__conductor.f_wake();
 	v_finalizer__conductor.f_wait(lock);
+	v_finalizer__conductor.f_wake();
+	v_finalizer__conductor.f_wait(lock);
 }
 
 template<typename T_type>
