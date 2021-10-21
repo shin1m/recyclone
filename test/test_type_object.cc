@@ -1,4 +1,9 @@
 #include <recyclone/engine.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#include <cassert>
+#define NDEBUG
+#endif
 
 using namespace recyclone;
 

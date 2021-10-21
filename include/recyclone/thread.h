@@ -129,6 +129,7 @@ class t_thread
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_release);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
+	RECYCLONE__NOINLINE void f_epoch_enter();
 #ifdef RECYCLONE__COOPERATIVE
 	static void f_epoch_off()
 	{
@@ -145,7 +146,6 @@ class t_thread
 		v_current->f_epoch_get();
 		v_current->f_epoch_sleep();
 	}
-	void f_epoch_enter();
 	void f_epoch_leave();
 	void f_epoch_suspend()
 	{
@@ -323,18 +323,20 @@ t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 	f_engine<T_type>()->v_thread__head = this;
 }
 
-#ifdef RECYCLONE__COOPERATIVE
 template<typename T_type>
 void t_thread<T_type>::f_epoch_enter()
 {
 	f_epoch_get();
+#ifdef RECYCLONE__COOPERATIVE
 	while (true) {
 		auto p = f_epoch_off;
 		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_on, std::memory_order_release, std::memory_order_relaxed)) break;
 		f_epoch_sleep();
 	}
+#endif
 }
 
+#ifdef RECYCLONE__COOPERATIVE
 template<typename T_type>
 void t_thread<T_type>::f_epoch_leave()
 {

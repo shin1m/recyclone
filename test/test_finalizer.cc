@@ -8,7 +8,11 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
+#ifdef NDEBUG
+	options.v_verbose = true;
+#else
 	options.v_verbose = options.v_verify = true;
+#endif
 	t_engine_with_finalizer engine(options, [](auto a_p)
 	{
 		f_epoch_point<t_type>();
@@ -47,7 +51,9 @@ int main(int argc, char* argv[])
 			t_epoch_region<t_type> region;
 			std::printf("resurrected: %s\n", s.c_str());
 		}
+#ifndef NDEBUG
 		assert(v_resurrected);
+#endif
 		v_resurrected = nullptr;
 	});
 	engine.f_collect();
@@ -56,6 +62,8 @@ int main(int argc, char* argv[])
 		t_epoch_region<t_type> region;
 		std::printf("finalized: %zu\n", v_finalized);
 	}
+#ifndef NDEBUG
 	assert(v_finalized == 1);
+#endif
 	return engine.f_exit(0);
 }

@@ -505,11 +505,7 @@ template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
 	{
-#ifdef RECYCLONE__COOPERATIVE
 		v_thread__main->f_epoch_enter();
-#else
-		v_thread__main->f_epoch_get();
-#endif
 		std::lock_guard lock(v_thread__mutex);
 		++v_thread__main->v_done;
 	}
@@ -654,11 +650,7 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 				a_thread->v_internal = nullptr;
 			}
 			t_slot<T_type>::t_decrements::f_push(a_thread);
-#ifdef RECYCLONE__COOPERATIVE
 			internal->f_epoch_enter();
-#else
-			internal->f_epoch_get();
-#endif
 			std::lock_guard lock(v_thread__mutex);
 			++internal->v_done;
 			v_thread__condition.notify_all();

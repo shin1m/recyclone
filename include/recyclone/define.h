@@ -10,7 +10,7 @@
 #ifdef _MSC_VER
 #define RECYCLONE__THREAD __declspec(thread)
 #define RECYCLONE__ALWAYS_INLINE
-#define RECYCLONE__NOINLINE
+#define RECYCLONE__NOINLINE __declspec(noinline)
 #define RECYCLONE__FORCE_INLINE __forceinline
 #endif
 

@@ -7,7 +7,11 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
+#ifdef NDEBUG
+	options.v_verbose = true;
+#else
 	options.v_verbose = options.v_verify = true;
+#endif
 	t_engine_with_finalizer engine(options, [](auto a_p)
 	{
 		f_epoch_point<t_type>();
@@ -27,7 +31,9 @@ int main(int argc, char* argv[])
 		assert(w->f_target() == x);
 	});
 	engine.f_collect();
+#ifndef NDEBUG
 	assert(w->f_target() == nullptr);
+#endif
 	f_padding([&]
 	{
 		f_epoch_point<t_type>();
@@ -47,7 +53,9 @@ int main(int argc, char* argv[])
 	engine.f_collect();
 	engine.f_finalize();
 	engine.f_collect();
+#ifndef NDEBUG
 	assert(w->f_target() == nullptr);
+#endif
 	f_padding([&]
 	{
 		f_epoch_point<t_type>();
