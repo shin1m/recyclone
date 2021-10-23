@@ -6,21 +6,16 @@
 //! An example thread implementation.
 struct t_thread : t_object<t_type>
 {
-	bool v_background = false;
+	const bool v_background;
 	//! Required by recyclone.
 	recyclone::t_thread<t_type>* v_internal = nullptr;
 
 	//! Called by f_new<t_thread>(...).
-	void f_construct(bool a_background)
+	t_thread(bool a_background) : v_background(a_background)
 	{
-		v_background = a_background;
 	}
 	//! Called by t_type_of<t_thread>::f_scan(...).
 	void f_scan(t_scan<t_type>)
-	{
-	}
-	//! Called by t_type_of<t_thread>::f_finalize(...).
-	void f_destruct()
 	{
 	}
 	//! Called by recyclone::t_engine::f_start(...) on a new thread

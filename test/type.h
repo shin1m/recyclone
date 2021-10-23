@@ -54,7 +54,7 @@ struct t_type_of : t_type
 			// Just delegates to a_this.
 			auto p = static_cast<T*>(a_this);
 			p->f_scan(a_scan);
-			p->f_destruct();
+			p->~T();
 		};
 	}
 };
@@ -67,7 +67,7 @@ T* f_new(T_an&&... a_n)
 {
 	f_epoch_point<t_type>();
 	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
-	p->f_construct(std::forward<T_an>(a_n)...);
+	new(p) T(std::forward<T_an>(a_n)...);
 	// Finishes object construction.
 	p->f_be(&t_type_of<T>::v_instance);
 	return p;

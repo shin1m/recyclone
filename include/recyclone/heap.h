@@ -5,7 +5,6 @@
 #include <atomic>
 #include <map>
 #include <mutex>
-#include <new>
 #ifdef __unix__
 #include <sys/mman.h>
 #endif
@@ -55,14 +54,12 @@ class t_heap
 			auto block = static_cast<char*>(f_map(length));
 			auto p = block;
 			for (size_t i = 1; i < A_size; ++i) {
-				auto q = new(p) T;
+				auto q = new(p) T(A_rank);
 				q->v_next = reinterpret_cast<T*>(p += size);
-				q->v_rank = A_rank;
 			}
-			auto q = new(p) T;
-			q->v_rank = A_rank;
-			q = reinterpret_cast<T*>(block);
-			q->v_cyclic = A_size;
+			new(p) T(A_rank);
+			auto q = reinterpret_cast<T*>(block);
+			q->v_chunk_size = A_size;
 			{
 				std::lock_guard lock(a_heap.v_mutex);
 				a_heap.v_blocks.emplace(q, length);
@@ -74,17 +71,17 @@ class t_heap
 		T* f_allocate(t_heap& a_heap)
 		{
 			auto p = v_chunks.load(std::memory_order_acquire);
-			while (p && !v_chunks.compare_exchange_weak(p, p->v_previous, std::memory_order_acquire));
+			while (p && !v_chunks.compare_exchange_weak(p, p->v_chunk_next, std::memory_order_acquire));
 			if (!p) p = f_grow(a_heap);
-			v_allocated.fetch_add(p->v_cyclic, std::memory_order_relaxed);
+			v_allocated.fetch_add(p->v_chunk_size, std::memory_order_relaxed);
 			return p;
 		}
 		void f_return(size_t a_n)
 		{
 			auto p = v_head<A_rank>;
-			p->v_cyclic = a_n;
-			p->v_previous = v_chunks.load(std::memory_order_relaxed);
-			while (!v_chunks.compare_exchange_weak(p->v_previous, p, std::memory_order_release));
+			p->v_chunk_size = a_n;
+			p->v_chunk_next = v_chunks.load(std::memory_order_relaxed);
+			while (!v_chunks.compare_exchange_weak(p->v_chunk_next, p, std::memory_order_release));
 			v_head<A_rank> = nullptr;
 			v_returned += a_n;
 		}
@@ -255,13 +252,10 @@ T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 template<typename T>
 T* t_heap<T>::f_allocate_large(size_t a_size)
 {
-	auto p = new(f_map(a_size)) T;
-	p->v_rank = 57;
-	{
-		std::lock_guard lock(v_mutex);
-		v_blocks.emplace(p, a_size);
-		++v_allocated;
-	}
+	auto p = new(f_map(a_size)) T(57);
+	std::lock_guard lock(v_mutex);
+	v_blocks.emplace(p, a_size);
+	++v_allocated;
 	return p;
 }
 

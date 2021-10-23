@@ -28,7 +28,7 @@ struct t_type_of : t_type
 	{
 		f_epoch_point<t_type>();
 		auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
-		p->f_construct(std::forward<T_an>(a_n)...);
+		new(p) T(std::forward<T_an>(a_n)...);
 		// Finishes object construction.
 		p->f_be(this);
 		return p;
@@ -67,7 +67,7 @@ struct t_type_of<t_type> : t_type
 			// Just delegates to a_this.
 			auto p = static_cast<T*>(a_this);
 			p->f_scan(a_scan);
-			p->f_destruct();
+			p->~T();
 		};
 		// t_type_of<T> is an instance of t_type_of<t_type>.
 		p->f_be(this);
@@ -81,22 +81,15 @@ struct t_pair : t_object<t_type>
 	t_slot_of<t_object<t_type>> v_tail;
 
 	//! Called by t_type_of<t_pair>::f_new(...).
-	void f_construct(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr)
+	t_pair(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
 	{
 		f_epoch_point<t_type>();
-		// Members have not been constructed yet at this point.
-		new(&v_head) decltype(v_head)(a_head);
-		new(&v_tail) decltype(v_tail)(a_tail);
 	}
 	//! Called by t_type_of<t_pair>::f_scan(...).
 	void f_scan(t_scan<t_type> a_scan)
 	{
 		a_scan(v_head);
 		a_scan(v_tail);
-	}
-	//! Called by t_type_of<t_pair>::f_finalize(...).
-	void f_destruct()
-	{
 	}
 };
 

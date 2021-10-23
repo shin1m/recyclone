@@ -69,17 +69,28 @@ class t_object
 	}
 
 	t_object* v_next;
-	t_object* v_previous;
+	union
+	{
+		t_object* v_previous;
+		t_object* v_chunk_next;
+	};
 	t_object* v_scan;
 	t_color v_color;
 	bool v_finalizee;
-	size_t v_count = 1;
-	size_t v_cyclic;
+	size_t v_count;
+	union
+	{
+		size_t v_cyclic;
+		size_t v_chunk_size;
+	};
 	size_t v_rank;
 	t_object* v_next_cycle;
 	T_type* v_type;
 	std::atomic<t_extension<T_type>*> v_extension;
 
+	t_object(size_t a_rank) : v_count(1), v_rank(a_rank)
+	{
+	}
 	template<void (t_object::*A_push)()>
 	void f_push()
 	{
@@ -250,6 +261,14 @@ class t_object
 public:
 	using t_type = T_type;
 
+	/*!
+	  \sa t_engine::f_allocate clears v_next.
+	  But when placement new follows it, it is eliminated by lifetime dse.
+	  The initialization here is a workaround for this case.
+	 */
+	t_object() : v_next(nullptr)
+	{
+	}
 	/*!
 	  Finalizes the object construction.
 	  \param a_type The type of the object.

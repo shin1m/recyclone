@@ -12,22 +12,19 @@ struct t_pair : t_object<t_type>
 	t_slot_of<t_object<t_type>> v_tail;
 
 	//! Called by f_new<t_pair>(...).
-	void f_construct(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr)
+	t_pair(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
 	{
 		f_epoch_point<t_type>();
-		// Members have not been constructed yet at this point.
-		new(&v_head) decltype(v_head)(a_head);
-		new(&v_tail) decltype(v_tail)(a_tail);
 	}
+	//! Called by t_type_of<t_pair>::f_finalize(...).
+	/*~t_pair()
+	{
+	}*/
 	//! Called by t_type_of<t_pair>::f_scan(...).
 	void f_scan(t_scan<t_type> a_scan)
 	{
 		a_scan(v_head);
 		a_scan(v_tail);
-	}
-	//! Called by t_type_of<t_pair>::f_finalize(...).
-	void f_destruct()
-	{
 	}
 };
 
@@ -36,22 +33,13 @@ struct t_symbol : t_object<t_type>
 	std::string v_name;
 
 	//! Called by f_new<t_symbol>(...).
-	void f_construct(std::string_view a_name)
+	t_symbol(std::string_view a_name) : v_name(a_name)
 	{
 		f_epoch_point<t_type>();
-		// Members have not been constructed yet at this point.
-		new(&v_name) decltype(v_name)(a_name);
 	}
 	//! Called by t_type_of<t_symbol>::f_scan(...).
 	void f_scan(t_scan<t_type>)
 	{
-	}
-	template<typename T> using just = T;
-	//! Called by t_type_of<t_symbol>::f_finalize(...).
-	void f_destruct()
-	{
-		// Members must be destructed here.
-		v_name.~just<decltype(v_name)>();
 	}
 };
 

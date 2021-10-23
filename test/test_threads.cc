@@ -7,7 +7,7 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = options.v_verify = true;
 	t_engine_with_threads engine(options);
-	return engine.f_exit([&]
+	return engine.f_exit([&]() RECYCLONE__NOINLINE
 	{
 		f_epoch_point<t_type>();
 		auto p = f_new<t_pair>();
