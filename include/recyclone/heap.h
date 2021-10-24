@@ -19,6 +19,8 @@ namespace recyclone
 template<typename T>
 class t_heap
 {
+	static constexpr size_t V_UNIT = sizeof(void*) * 16;
+
 	static void* f_map(size_t a_n)
 	{
 #ifdef __unix__
@@ -49,7 +51,7 @@ class t_heap
 
 		T* f_grow(t_heap& a_heap)
 		{
-			auto size = 128 << A_rank;
+			auto size = V_UNIT << A_rank;
 			auto length = size * A_size;
 			auto block = static_cast<char*>(f_map(length));
 			auto p = block;
@@ -163,7 +165,7 @@ public:
 	}
 	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
-		if (a_size <= 1 << 7) [[likely]] return f_allocate(v_of0);
+		if (a_size <= V_UNIT) [[likely]] return f_allocate(v_of0);
 		return f_allocate_medium(a_size);
 	}
 	void f_return()
@@ -236,7 +238,7 @@ public:
 			--i;
 		}
 		size_t j = static_cast<char*>(a_p) - reinterpret_cast<char*>(i->first);
-		return j < i->second && (j & (128 << i->first->v_rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
+		return j < i->second && (j & (V_UNIT << i->first->v_rank) - 1) == 0 ? static_cast<T*>(a_p) : nullptr;
 	}
 };
 
@@ -262,12 +264,12 @@ T* t_heap<T>::f_allocate_large(size_t a_size)
 template<typename T>
 constexpr T* t_heap<T>::f_allocate_medium(size_t a_size)
 {
-	if (a_size <= 1 << 8) return f_allocate(v_of1);
-	if (a_size <= 1 << 9) return f_allocate(v_of2);
-	if (a_size <= 1 << 10) return f_allocate(v_of3);
-	if (a_size <= 1 << 11) return f_allocate(v_of4);
-	if (a_size <= 1 << 12) return f_allocate(v_of5);
-	if (a_size <= 1 << 13) return f_allocate(v_of6);
+	if (a_size <= V_UNIT << 1) return f_allocate(v_of1);
+	if (a_size <= V_UNIT << 2) return f_allocate(v_of2);
+	if (a_size <= V_UNIT << 3) return f_allocate(v_of3);
+	if (a_size <= V_UNIT << 4) return f_allocate(v_of4);
+	if (a_size <= V_UNIT << 5) return f_allocate(v_of5);
+	if (a_size <= V_UNIT << 6) return f_allocate(v_of6);
 	return f_allocate_large(a_size);
 }
 
