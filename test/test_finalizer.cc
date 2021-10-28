@@ -18,21 +18,25 @@ int main(int argc, char* argv[])
 		f_epoch_point<t_type>();
 		if (a_p->f_type() != &t_type_of<t_pair>::v_instance) return;
 		auto s = f_string(a_p);
+		f_epoch_region<t_type>([&]
 		{
-			t_epoch_region<t_type> region;
 			std::printf("%s -> ", s.c_str());
-		}
+		});
 		auto p = static_cast<t_pair*>(a_p);
 		if (p->v_head && p->v_head->f_type() == &t_type_of<t_symbol>::v_instance && static_cast<t_symbol*>(p->v_head)->v_name == "resurrected"sv) {
 			++v_finalized;
-			t_epoch_region<t_type> region;
-			std::printf("finalized\n");
+			f_epoch_region<t_type>([]
+			{
+				std::printf("finalized\n");
+			});
 		} else {
 			p->v_head = f_new<t_symbol>("resurrected"sv);
 			v_resurrected = p;
 			p->f_finalizee__(true);
-			t_epoch_region<t_type> region;
-			std::printf("resurrected\n");
+			f_epoch_region<t_type>([]
+			{
+				std::printf("resurrected\n");
+			});
 		}
 	});
 	f_padding([]
@@ -47,10 +51,10 @@ int main(int argc, char* argv[])
 	{
 		f_epoch_point<t_type>();
 		auto s = f_string(v_resurrected);
+		f_epoch_region<t_type>([&]
 		{
-			t_epoch_region<t_type> region;
 			std::printf("resurrected: %s\n", s.c_str());
-		}
+		});
 #ifndef NDEBUG
 		assert(v_resurrected);
 #endif
@@ -58,10 +62,10 @@ int main(int argc, char* argv[])
 	});
 	engine.f_collect();
 	engine.f_finalize();
+	f_epoch_region<t_type>([]
 	{
-		t_epoch_region<t_type> region;
 		std::printf("finalized: %zu\n", v_finalized);
-	}
+	});
 #ifndef NDEBUG
 	assert(v_finalized == 1);
 #endif

@@ -116,7 +116,7 @@ protected:
 	}
 	t_object<T_type>* f_object__find(void* a_p)
 	{
-		if (reinterpret_cast<uintptr_t>(a_p) & 127) return nullptr;
+		if (reinterpret_cast<uintptr_t>(a_p) & t_heap<t_object<T_type>>::V_UNIT - 1) return nullptr;
 		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type ? p : nullptr;
 	}
@@ -176,8 +176,10 @@ public:
 #ifdef RECYCLONE__COOPERATIVE
 	void f_wait()
 	{
-		t_epoch_region<T_type> region;
-		f__wait();
+		f_epoch_region<T_type>([this]
+		{
+			f__wait();
+		});
 	}
 	void f__wait()
 #else
@@ -401,23 +403,24 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 {
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer starting...\n");
 	while (true) {
+		f_epoch_region<T_type>([this]
 		{
-			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = true;
-		}
+		});
+		if (f_epoch_region<T_type>([&, this]
 		{
-			t_epoch_region<T_type> region;
 			std::unique_lock lock(v_finalizer__conductor.v_mutex);
-			if (v_finalizer__conductor.v_quitting) break;
+			if (v_finalizer__conductor.v_quitting) return true;
 			v_finalizer__conductor.f_next(lock);
-		}
+			return false;
+		})) break;
+		f_epoch_region<T_type>([this]
 		{
-			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = false;
 			v_finalizer__awaken = 2;
-		}
+		});
 #ifndef NDEBUG
 		[this, a_finalize]
 		{
@@ -466,12 +469,27 @@ size_t t_engine<T_type>::f_statistics()
 	return allocated - freed;
 }
 
+#ifdef __EMSCRIPTEN__
+// Workaround to prevent runtime from exiting
+// on calling emscripten_scan_registers()
+// with PROXY_TO_PTHREAD & ASYNCIFY & EXIT_RUNTIME.
+EM_JS(void, f_keepalive_push, (), {
+	runtimeKeepalivePush();
+});
+EM_JS(void, f_keepalive_pop, (), {
+	runtimeKeepalivePop();
+});
+#endif
+
 template<typename T_type>
 t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
 {
 	v_instance->f_tick();
 }), v_options(a_options)
 {
+#ifdef __EMSCRIPTEN__
+	f_keepalive_push();
+#endif
 	v_instance = this;
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
@@ -505,7 +523,7 @@ template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
 	{
-		v_thread__main->f_epoch_enter();
+		v_thread__main->f_epoch_done();
 		std::lock_guard lock(v_thread__mutex);
 		++v_thread__main->v_done;
 	}
@@ -528,6 +546,9 @@ t_engine<T_type>::~t_engine()
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
 #endif
+#endif
+#ifdef __EMSCRIPTEN__
+	f_keepalive_pop();
 #endif
 	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {
@@ -552,8 +573,8 @@ t_engine<T_type>::~t_engine()
 template<typename T_type>
 int t_engine<T_type>::f_exit(int a_code)
 {
+	f_epoch_region<T_type>([this]
 	{
-		t_epoch_region<T_type> region;
 		std::unique_lock lock(v_thread__mutex);
 		auto tail = v_thread__finalizer ? v_thread__finalizer : v_thread__main;
 		while (true) {
@@ -563,7 +584,7 @@ int t_engine<T_type>::f_exit(int a_code)
 			v_thread__condition.wait(lock);
 		}
 		v_exiting = true;
-	}
+	});
 	if (v_options.v_verify) {
 		v_object__heap.f_return();
 		{
@@ -577,10 +598,12 @@ int t_engine<T_type>::f_exit(int a_code)
 		f_wait();
 		f_finalize();
 		assert(v_thread__head == v_thread__finalizer);
-		t_epoch_region<T_type> region;
-		v_finalizer__conductor.f_quit();
-		std::unique_lock lock(v_thread__mutex);
-		while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
+		f_epoch_region<T_type>([this]
+		{
+			v_finalizer__conductor.f_quit();
+			std::unique_lock lock(v_thread__mutex);
+			while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
+		});
 		return a_code;
 	} else {
 		if (v_options.v_verbose) f_statistics();
@@ -608,27 +631,29 @@ void t_engine<T_type>::f_collect()
 template<typename T_type>
 void t_engine<T_type>::f_finalize()
 {
-	t_epoch_region<T_type> region;
-	std::unique_lock lock(v_finalizer__conductor.v_mutex);
-	v_finalizer__conductor.f_wake();
-	v_finalizer__conductor.f_wait(lock);
-	v_finalizer__conductor.f_wake();
-	v_finalizer__conductor.f_wait(lock);
+	f_epoch_region<T_type>([this]
+	{
+		std::unique_lock lock(v_finalizer__conductor.v_mutex);
+		v_finalizer__conductor.f_wake();
+		v_finalizer__conductor.f_wait(lock);
+		v_finalizer__conductor.f_wake();
+		v_finalizer__conductor.f_wait(lock);
+	});
 }
 
 template<typename T_type>
 template<typename T_thread, typename T_main>
 void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 {
+	f_epoch_region<T_type>([&, this]
 	{
-		t_epoch_region<T_type> region;
 		std::lock_guard lock(v_thread__mutex);
 		if (a_thread->v_internal) throw std::runtime_error("already started.");
 		a_thread->v_internal = new t_thread<T_type>();
-	}
+	});
 	t_slot<T_type>::t_increments::f_push(a_thread);
 	try {
-		std::thread([this, a_thread, main = std::move(a_main)]()
+		std::thread([this, a_thread, main = std::move(a_main)]
 		{
 			v_instance = this;
 			auto internal = a_thread->v_internal;
@@ -643,26 +668,26 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
 			} catch (...) {
 			}
 			v_object__heap.f_return();
+			f_epoch_region<T_type>([&, this]
 			{
-				t_epoch_region<T_type> region;
 				std::lock_guard lock(v_thread__mutex);
 				internal->v_background = false;
 				a_thread->v_internal = nullptr;
-			}
+			});
 			t_slot<T_type>::t_decrements::f_push(a_thread);
-			internal->f_epoch_enter();
+			internal->f_epoch_done();
 			std::lock_guard lock(v_thread__mutex);
 			++internal->v_done;
 			v_thread__condition.notify_all();
 		}).detach();
 	} catch (...) {
+		f_epoch_region<T_type>([&, this]
 		{
-			t_epoch_region<T_type> region;
 			std::lock_guard lock(v_thread__mutex);
 			a_thread->v_internal->v_done = 1;
 			a_thread->v_internal = nullptr;
 			v_thread__condition.notify_all();
-		}
+		});
 		t_slot<T_type>::t_decrements::f_push(a_thread);
 		throw;
 	}
@@ -674,9 +699,11 @@ void t_engine<T_type>::f_join(T_thread* a_thread)
 {
 	if (a_thread->v_internal == t_thread<T_type>::v_current) throw std::runtime_error("current thread can not be joined.");
 	if (a_thread->v_internal == v_thread__main) throw std::runtime_error("engine thread can not be joined.");
-	t_epoch_region<T_type> region;
-	std::unique_lock lock(v_thread__mutex);
-	while (a_thread->v_internal) v_thread__condition.wait(lock);
+	f_epoch_region<T_type>([&, this]
+	{
+		std::unique_lock lock(v_thread__mutex);
+		while (a_thread->v_internal) v_thread__condition.wait(lock);
+	});
 }
 
 template<typename T_type>

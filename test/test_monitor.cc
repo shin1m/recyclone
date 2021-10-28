@@ -19,33 +19,33 @@ int main(int argc, char* argv[])
 		};
 		::t_thread* worker;
 		{
+			f_epoch_region<t_type>([&]
 			{
-				t_epoch_region<t_type> region;
 				mutex.lock();
-			}
+			});
 			std::unique_lock lock(mutex, std::adopt_lock);
 			worker = engine.f_start_thread([&]
 			{
 				f_epoch_point<t_type>();
+				f_epoch_region<t_type>([]
 				{
-					t_epoch_region<t_type> region;
 					std::printf("start\n");
-				}
+				});
 				try {
 					while (true) {
 						{
+							f_epoch_region<t_type>([&]
 							{
-								t_epoch_region<t_type> region;
 								mutex.lock();
-							}
+							});
 							std::unique_lock lock(mutex, std::adopt_lock);
 							action = nullptr;
 							condition.notify_one();
 							while (!action) {
+								f_epoch_region<t_type>([&]
 								{
-									t_epoch_region<t_type> region;
 									condition.wait(lock);
-								}
+								});
 								f_epoch_point<t_type>();
 							}
 						}
@@ -53,32 +53,34 @@ int main(int argc, char* argv[])
 						f_epoch_point<t_type>();
 					}
 				} catch (std::nullptr_t) {}
-				t_epoch_region<t_type> region;
-				std::printf("exit\n");
+				f_epoch_region<t_type>([]
+				{
+					std::printf("exit\n");
+				});
 			});
 			while (action) {
+				f_epoch_region<t_type>([&]
 				{
-					t_epoch_region<t_type> region;
 					condition.wait(lock);
-				}
+				});
 				f_epoch_point<t_type>();
 			}
 		}
 		auto send = [&](auto x)
 		{
 			f_epoch_point<t_type>();
+			f_epoch_region<t_type>([&]
 			{
-				t_epoch_region<t_type> region;
 				mutex.lock();
-			}
+			});
 			std::unique_lock lock(mutex, std::adopt_lock);
 			action = x;
 			condition.notify_one();
 			while (action) {
+				f_epoch_region<t_type>([&]
 				{
-					t_epoch_region<t_type> region;
 					condition.wait(lock);
-				}
+				});
 				f_epoch_point<t_type>();
 			}
 		};
@@ -94,10 +96,10 @@ int main(int argc, char* argv[])
 			log += "World.";
 		});
 		{
+			f_epoch_region<t_type>([&]
 			{
-				t_epoch_region<t_type> region;
 				mutex.lock();
-			}
+			});
 			std::unique_lock lock(mutex, std::adopt_lock);
 			action = []
 			{
@@ -107,10 +109,10 @@ int main(int argc, char* argv[])
 			condition.notify_one();
 		}
 		engine.f_join(worker);
+		f_epoch_region<t_type>([&]
 		{
-			t_epoch_region<t_type> region;
 			std::printf("%s\n", log.c_str());
-		}
+		});
 		assert(log == "Hello, World.");
 		return 0;
 	}());

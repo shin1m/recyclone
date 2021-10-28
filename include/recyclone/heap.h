@@ -19,8 +19,6 @@ namespace recyclone
 template<typename T>
 class t_heap
 {
-	static constexpr size_t V_UNIT = sizeof(void*) * 16;
-
 	static void* f_map(size_t a_n)
 	{
 #ifdef __unix__
@@ -140,6 +138,8 @@ class t_heap
 	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
+	static constexpr size_t V_UNIT = sizeof(void*) * 16;
+
 	t_heap(void(*a_tick)()) : v_tick(a_tick)
 	{
 	}

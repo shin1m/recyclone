@@ -14,6 +14,15 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #endif
+#ifdef RECYCLONE__COOPERATIVE
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+#ifdef __unix__
+#include <ucontext.h>
+#endif
+#endif
+#endif
 
 namespace recyclone
 {
@@ -22,6 +31,8 @@ template<typename T_type>
 void f_epoch_point();
 template<typename T_type>
 struct t_epoch_region;
+template<typename T_type, typename T>
+auto f_epoch_region(T);
 
 //! A set of thread data for garbage collection.
 template<typename T_type>
@@ -31,6 +42,7 @@ class t_thread
 	friend class t_weak_pointer<T_type>;
 	friend void recyclone::f_epoch_point<T_type>();
 	friend struct t_epoch_region<T_type>;
+	template<typename, typename T> friend auto f_epoch_region(T);
 
 	static size_t f_page()
 	{
@@ -92,6 +104,10 @@ class t_thread
 	void(*v_epoch__at)();
 	std::mutex v_epoch__mutex;
 	std::condition_variable v_epoch__done;
+#ifdef __EMSCRIPTEN__
+	void* v_registers_first;
+	void* v_registers_last;
+#endif
 #endif
 #ifdef __unix__
 	pthread_t v_handle;
@@ -122,15 +138,39 @@ class t_thread
 	}
 #endif
 	void f_initialize(void* a_bottom);
-	void f_epoch_get()
+	void f_epoch__get()
 	{
-		t_object<T_type>* dummy = nullptr;
-		v_stack_top = &dummy;
 		v_increments.v_epoch.store(v_increments.v_head, std::memory_order_release);
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
-	RECYCLONE__NOINLINE void f_epoch_enter();
 #ifdef RECYCLONE__COOPERATIVE
+	template<typename T>
+	auto f_epoch_get(T a_do)
+	{
+#ifdef __EMSCRIPTEN__
+		emscripten_scan_registers([](auto a_first, auto a_last)
+		{
+			v_current->v_registers_first = a_first;
+			v_current->v_registers_last = a_last;
+		});
+		auto n = static_cast<char*>(v_registers_last) - static_cast<char*>(v_registers_first);
+		v_stack_top = reinterpret_cast<t_object<T_type>**>(alloca(n));
+		std::memcpy(v_stack_top, v_registers_first, n);
+#else
+#ifdef __unix__
+		ucontext_t context;
+		getcontext(&context);
+#endif
+#ifdef _WIN32
+		CONTEXT context;
+		context.ContextFlags = CONTEXT_FULL;
+		GetThreadContext(v_handle, &context);
+#endif
+		v_stack_top = reinterpret_cast<t_object<T_type>**>(&context);
+#endif
+		f_epoch__get();
+		return a_do();
+	}
 	static void f_epoch_off()
 	{
 	}
@@ -143,10 +183,14 @@ class t_thread
 	}
 	static void f_epoch_on()
 	{
-		v_current->f_epoch_get();
-		v_current->f_epoch_sleep();
+		v_current->f_epoch_get([]
+		{
+			v_current->f_epoch_sleep();
+		});
 	}
-	void f_epoch_leave();
+	RECYCLONE__NOINLINE void f_epoch_enter();
+	RECYCLONE__NOINLINE void f_epoch_leave();
+	RECYCLONE__NOINLINE void f_epoch_done();
 	void f_epoch_suspend()
 	{
 		std::unique_lock lock(v_epoch__mutex);
@@ -167,6 +211,12 @@ class t_thread
 		v_epoch__done.notify_one();
 	}
 #else
+	void f_epoch_get()
+	{
+		t_object<T_type>* dummy = nullptr;
+		v_stack_top = &dummy;
+		f_epoch__get();
+	}
 	void f_epoch_suspend()
 	{
 #ifdef __unix__
@@ -201,6 +251,10 @@ class t_thread
 #ifdef _WIN32
 		ResumeThread(v_handle);
 #endif
+	}
+	void f_epoch_done()
+	{
+		f_epoch__get();
 	}
 #endif
 	void f_epoch();
@@ -323,20 +377,17 @@ t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 	f_engine<T_type>()->v_thread__head = this;
 }
 
+#ifdef RECYCLONE__COOPERATIVE
 template<typename T_type>
 void t_thread<T_type>::f_epoch_enter()
 {
-	f_epoch_get();
-#ifdef RECYCLONE__COOPERATIVE
 	while (true) {
 		auto p = f_epoch_off;
 		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_on, std::memory_order_release, std::memory_order_relaxed)) break;
 		f_epoch_sleep();
 	}
-#endif
 }
 
-#ifdef RECYCLONE__COOPERATIVE
 template<typename T_type>
 void t_thread<T_type>::f_epoch_leave()
 {
@@ -348,6 +399,28 @@ void t_thread<T_type>::f_epoch_leave()
 		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_off, std::memory_order_relaxed, std::memory_order_relaxed)) break;
 		v_epoch__done.wait(lock);
 	}
+}
+
+template<typename T_type>
+struct t_epoch_region
+{
+	t_epoch_region()
+	{
+		t_thread<T_type>::v_current->f_epoch_enter();
+	}
+	~t_epoch_region()
+	{
+		t_thread<T_type>::v_current->f_epoch_leave();
+	}
+};
+
+template<typename T_type>
+void t_thread<T_type>::f_epoch_done()
+{
+	f_epoch_get([this]
+	{
+		f_epoch_enter();
+	});
 }
 #endif
 
@@ -372,20 +445,21 @@ inline void f_epoch_point()
   For each blocking operation, this should be placed at the closest scope surrounding it.
   The object graph must not be manipulated within the region.
  */
-template<typename T_type>
-struct t_epoch_region
-{
+template<typename T_type, typename T>
 #ifdef RECYCLONE__COOPERATIVE
-	t_epoch_region()
+RECYCLONE__NOINLINE auto f_epoch_region(T a_do)
+{
+	return t_thread<T_type>::v_current->f_epoch_get([&]
 	{
-		t_thread<T_type>::v_current->f_epoch_enter();
-	}
-	~t_epoch_region()
-	{
-		t_thread<T_type>::v_current->f_epoch_leave();
-	}
+		t_epoch_region<T_type> region;
+		return a_do();
+	});
+#else
+inline auto f_epoch_region(T a_do)
+{
+	return a_do();
 #endif
-};
+}
 
 }
 

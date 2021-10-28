@@ -64,20 +64,20 @@ int main(int argc, char* argv[])
 		{
 			f_epoch_point<t_type>();
 			auto s = f_string(a_towers);
+			f_epoch_region<t_type>([&]
 			{
-				t_epoch_region<t_type> region;
 				std::printf("%s\n", s.c_str());
-			}
+			});
 			auto tower = static_cast<t_pair*>(f_get(a_towers, a_from));
 			return f_put(f_put(a_towers, a_from, tower->v_tail), a_to,
 				f_new<t_pair>(tower->v_head, f_get(a_towers, a_to))
 			);
 		});
 		auto s = f_string(towers);
+		f_epoch_region<t_type>([&]
 		{
-			t_epoch_region<t_type> region;
 			std::printf("%s\n", s.c_str());
-		}
+		});
 		assert(s == "(() () (a b c d e))");
 		return 0;
 	}());
