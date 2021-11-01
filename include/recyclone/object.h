@@ -88,9 +88,6 @@ class t_object
 	T_type* v_type;
 	std::atomic<t_extension<T_type>*> v_extension;
 
-	t_object(size_t a_rank) : v_count(1), v_rank(a_rank)
-	{
-	}
 	template<void (t_object::*A_push)()>
 	void f_push()
 	{
@@ -256,6 +253,11 @@ class t_object
 	void f_own()
 	{
 		t_slot<T_type>::t_increments::f_push(this);
+	}
+
+protected:
+	t_object(size_t a_rank) : v_count(1), v_rank(a_rank)
+	{
 	}
 
 public:
