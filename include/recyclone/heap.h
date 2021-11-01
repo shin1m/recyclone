@@ -19,6 +19,10 @@ namespace recyclone
 template<typename T>
 class t_heap
 {
+	static constexpr size_t f_log(size_t a_x)
+	{
+		return a_x > 1 ? f_log(a_x >> 1) + 1 : 0;
+	}
 	static void* f_map(size_t a_n)
 	{
 #ifdef __unix__
@@ -138,7 +142,12 @@ class t_heap
 	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
-	static constexpr size_t V_UNIT = sizeof(void*) * 16;
+	static constexpr size_t V_UNIT = 2 << f_log(sizeof(T) - 1);
+	static_assert(V_UNIT >> 1 < sizeof(T));
+	static_assert(V_UNIT >= sizeof(T));
+	static constexpr size_t V_RANKX = sizeof(void*) * 8 - f_log(V_UNIT);
+	static_assert((V_UNIT << (V_RANKX - 1)) - 1 == ~size_t(0) >> 1);
+	static_assert((V_UNIT << V_RANKX) - 1 == ~size_t(0));
 
 	t_heap(void(*a_tick)()) : v_tick(a_tick)
 	{
@@ -161,7 +170,7 @@ public:
 		a_each(size_t(4), v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned);
 		a_each(size_t(5), v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned);
 		a_each(size_t(6), v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
-		a_each(size_t(57), size_t(0), v_allocated, v_freed);
+		a_each(size_t(V_RANKX), size_t(0), v_allocated, v_freed);
 	}
 	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
 	{
@@ -254,7 +263,7 @@ T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 template<typename T>
 T* t_heap<T>::f_allocate_large(size_t a_size)
 {
-	auto p = new(f_map(a_size)) T(57);
+	auto p = new(f_map(a_size)) T(V_RANKX);
 	std::lock_guard lock(v_mutex);
 	v_blocks.emplace(p, a_size);
 	++v_allocated;
