@@ -29,8 +29,12 @@ namespace recyclone
 
 template<typename T_type>
 void f_epoch_point();
+#ifdef RECYCLONE__COOPERATIVE
 template<typename T_type>
 struct t_epoch_region;
+template<typename T_type>
+struct t_epoch_noiger;
+#endif
 template<typename T_type, typename T>
 auto f_epoch_region(T);
 
@@ -40,8 +44,11 @@ class t_thread
 {
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
-	friend void recyclone::f_epoch_point<T_type>();
+	friend void f_epoch_point<T_type>();
+#ifdef RECYCLONE__COOPERATIVE
 	friend struct t_epoch_region<T_type>;
+	friend struct t_epoch_noiger<T_type>;
+#endif
 	template<typename, typename T> friend auto f_epoch_region(T);
 
 	static size_t f_page()
@@ -402,6 +409,15 @@ void t_thread<T_type>::f_epoch_leave()
 }
 
 template<typename T_type>
+void t_thread<T_type>::f_epoch_done()
+{
+	f_epoch_get([this]
+	{
+		f_epoch_enter();
+	});
+}
+
+template<typename T_type>
 struct t_epoch_region
 {
 	t_epoch_region()
@@ -415,13 +431,17 @@ struct t_epoch_region
 };
 
 template<typename T_type>
-void t_thread<T_type>::f_epoch_done()
+struct t_epoch_noiger
 {
-	f_epoch_get([this]
+	t_epoch_noiger()
 	{
-		f_epoch_enter();
-	});
-}
+		t_thread<T_type>::v_current->f_epoch_leave();
+	}
+	~t_epoch_noiger()
+	{
+		t_thread<T_type>::v_current->f_epoch_done();
+	}
+};
 #endif
 
 //! Polls epoch suspension request.
@@ -440,13 +460,13 @@ inline void f_epoch_point()
 #endif
 }
 
+#ifdef RECYCLONE__COOPERATIVE
 //! Establishes a region where epoch suspension is allowed.
 /*!
-  For each blocking operation, this should be placed at the closest scope surrounding it.
-  The object graph must not be manipulated within the region.
+  For each blocking operation, this should be placed surrounding it.
+  The object graph must not be manipulated inside the region.
  */
 template<typename T_type, typename T>
-#ifdef RECYCLONE__COOPERATIVE
 RECYCLONE__NOINLINE auto f_epoch_region(T a_do)
 {
 	return t_thread<T_type>::v_current->f_epoch_get([&]
@@ -454,12 +474,29 @@ RECYCLONE__NOINLINE auto f_epoch_region(T a_do)
 		t_epoch_region<T_type> region;
 		return a_do();
 	});
+}
+//! The opposite to \sa f_epoch_region.
+/*!
+  Inside the epoch region, this establishes an inverse region inside which the object graph can be manipulated.
+ */
+template<typename T_type, typename T>
+RECYCLONE__NOINLINE auto f_epoch_noiger(T a_do)
+{
+	t_epoch_noiger<T_type> noiger;
+	return a_do();
+}
 #else
+template<typename T_type, typename T>
 inline auto f_epoch_region(T a_do)
 {
 	return a_do();
-#endif
 }
+template<typename T_type, typename T>
+inline auto f_epoch_noiger(T a_do)
+{
+	return a_do();
+}
+#endif
 
 }
 
