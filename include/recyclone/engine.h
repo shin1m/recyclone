@@ -408,13 +408,14 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = true;
 		});
-		if (f_epoch_region<T_type>([&, this]
 		{
 			std::unique_lock lock(v_finalizer__conductor.v_mutex);
-			if (v_finalizer__conductor.v_quitting) return true;
-			v_finalizer__conductor.f_next(lock);
-			return false;
-		})) break;
+			if (v_finalizer__conductor.v_quitting) break;
+			f_epoch_region<T_type>([&, this]
+			{
+				v_finalizer__conductor.f_next(lock);
+			});
+		}
 		f_epoch_region<T_type>([this]
 		{
 			std::lock_guard lock(v_thread__mutex);
