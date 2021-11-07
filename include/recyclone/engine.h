@@ -470,18 +470,6 @@ size_t t_engine<T_type>::f_statistics()
 	return allocated - freed;
 }
 
-#ifdef __EMSCRIPTEN__
-// Workaround to prevent runtime from exiting
-// on calling emscripten_scan_registers()
-// with PROXY_TO_PTHREAD & ASYNCIFY & EXIT_RUNTIME.
-EM_JS(void, f_keepalive_push, (), {
-	runtimeKeepalivePush();
-});
-EM_JS(void, f_keepalive_pop, (), {
-	runtimeKeepalivePop();
-});
-#endif
-
 template<typename T_type>
 t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
 {
@@ -489,7 +477,10 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 }), v_options(a_options)
 {
 #ifdef __EMSCRIPTEN__
-	f_keepalive_push();
+	// Workaround to prevent runtime from exiting
+	// on calling emscripten_scan_registers()
+	// with PROXY_TO_PTHREAD & ASYNCIFY & EXIT_RUNTIME.
+	EM_ASM(runtimeKeepalivePush());
 #endif
 	v_instance = this;
 #ifndef RECYCLONE__COOPERATIVE
@@ -549,7 +540,7 @@ t_engine<T_type>::~t_engine()
 #endif
 #endif
 #ifdef __EMSCRIPTEN__
-	f_keepalive_pop();
+	EM_ASM(runtimeKeepalivePop());
 #endif
 	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {
