@@ -13,5 +13,11 @@
 #define RECYCLONE__NOINLINE __declspec(noinline)
 #define RECYCLONE__FORCE_INLINE __forceinline
 #endif
+#ifdef __EMSCRIPTEN__
+// Workaround to spill pointers.
+#define RECYCLONE__SPILL volatile
+#else
+#define RECYCLONE__SPILL
+#endif
 
 #endif

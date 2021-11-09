@@ -32,7 +32,7 @@ struct t_engine_with_threads : t_engine<t_type>
 	template<typename T>
 	::t_thread* f_start_thread(T a_main, bool a_background = false)
 	{
-		auto thread = f_new<::t_thread>(a_background);
+		auto RECYCLONE__SPILL thread = f_new<::t_thread>(a_background);
 		f_start(thread, std::move(a_main));
 		return thread;
 	}

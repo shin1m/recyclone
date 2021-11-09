@@ -18,9 +18,9 @@ template<typename T>
 t_fix(T&&) -> t_fix<std::decay_t<T>>;
 
 template<typename T_move>
-t_pair* f_hanoi(t_pair* a_tower, T_move a_move)
+t_pair* f_hanoi(t_pair* RECYCLONE__SPILL a_tower, T_move a_move)
 {
-	return t_fix([&](auto step, t_pair* a_height, t_pair* a_towers, size_t a_from, size_t a_via, size_t a_to) -> t_pair*
+	return t_fix([&](auto step, t_pair* RECYCLONE__SPILL a_height, t_pair* RECYCLONE__SPILL a_towers, size_t a_from, size_t a_via, size_t a_to) -> t_pair*
 	{
 		f_epoch_point<t_type>();
 		return a_height
@@ -32,12 +32,12 @@ t_pair* f_hanoi(t_pair* a_tower, T_move a_move)
 	})(static_cast<t_pair*>(a_tower->v_tail), f_new<t_pair>(a_tower, f_new<t_pair>(nullptr, f_new<t_pair>(nullptr))), 0, 1, 2);
 }
 
-t_object<t_type>* f_get(t_pair* a_xs, size_t a_i)
+t_object<t_type>* f_get(t_pair* RECYCLONE__SPILL a_xs, size_t a_i)
 {
 	return a_i > 0 ? f_get(static_cast<t_pair*>(a_xs->v_tail), a_i - 1) : static_cast<t_object<t_type>*>(a_xs->v_head);
 }
 
-t_pair* f_put(t_pair* a_xs, size_t a_i, t_object<t_type>* a_x)
+t_pair* f_put(t_pair* RECYCLONE__SPILL a_xs, size_t a_i, t_object<t_type>* RECYCLONE__SPILL a_x)
 {
 	f_epoch_point<t_type>();
 	return a_i > 0
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 			f_new<t_pair>(f_new<t_symbol>("c"sv),
 			f_new<t_pair>(f_new<t_symbol>("d"sv),
 			f_new<t_pair>(f_new<t_symbol>("e"sv)
-		))))), [](auto a_towers, auto a_from, auto a_to)
+		))))), [](auto RECYCLONE__SPILL a_towers, auto RECYCLONE__SPILL a_from, auto RECYCLONE__SPILL a_to)
 		{
 			f_epoch_point<t_type>();
 			auto s = f_string(a_towers);
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
 			{
 				std::printf("%s\n", s.c_str());
 			});
-			auto tower = static_cast<t_pair*>(f_get(a_towers, a_from));
+			auto RECYCLONE__SPILL tower = static_cast<t_pair*>(f_get(a_towers, a_from));
 			return f_put(f_put(a_towers, a_from, tower->v_tail), a_to,
 				f_new<t_pair>(tower->v_head, f_get(a_towers, a_to))
 			);

@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 	t_engine<t_type> engine(options);
 	return engine.f_exit([]
 	{
-		auto p = f_new<t_pair>(f_new<t_symbol>("outside"sv));
+		auto RECYCLONE__SPILL p = f_new<t_pair>(f_new<t_symbol>("outside"sv));
 		auto s = f_string(p);
 		f_epoch_region<t_type>([&]
 		{

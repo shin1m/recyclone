@@ -12,7 +12,7 @@ struct t_pair : t_object<t_type>
 	t_slot_of<t_object<t_type>> v_tail;
 
 	//! Called by f_new<t_pair>(...).
-	t_pair(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
+	t_pair(t_object<t_type>* RECYCLONE__SPILL a_head = nullptr, t_object<t_type>* RECYCLONE__SPILL a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
 	{
 		f_epoch_point<t_type>();
 	}
@@ -43,7 +43,7 @@ struct t_symbol : t_object<t_type>
 	}
 };
 
-inline std::string f_string(t_object<t_type>* a_value)
+inline std::string f_string(t_object<t_type>* RECYCLONE__SPILL a_value)
 {
 	f_epoch_point<t_type>();
 	if (!a_value) return "()";

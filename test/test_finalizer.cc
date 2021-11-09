@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
 #else
 	options.v_verbose = options.v_verify = true;
 #endif
-	t_engine_with_finalizer engine(options, [](auto a_p)
+	t_engine_with_finalizer engine(options, [](auto RECYCLONE__SPILL a_p)
 	{
 		f_epoch_point<t_type>();
 		if (a_p->f_type() != &t_type_of<t_pair>::v_instance) return;
@@ -42,8 +42,7 @@ int main(int argc, char* argv[])
 	f_padding([]
 	{
 		f_epoch_point<t_type>();
-		auto p = f_new<t_pair>(f_new<t_symbol>("foo"sv));
-		p->f_finalizee__(true);
+		f_new<t_pair>(f_new<t_symbol>("foo"sv))->f_finalizee__(true);
 	});
 	engine.f_collect();
 	engine.f_finalize();

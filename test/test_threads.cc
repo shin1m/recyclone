@@ -10,8 +10,8 @@ int main(int argc, char* argv[])
 	return engine.f_exit([&]() RECYCLONE__NOINLINE
 	{
 		f_epoch_point<t_type>();
-		auto p = f_new<t_pair>();
-		::t_thread* ts[10];
+		auto RECYCLONE__SPILL p = f_new<t_pair>();
+		::t_thread* RECYCLONE__SPILL ts[10];
 		for (size_t i = 0; i < 10; ++i) {
 			ts[i] = engine.f_start_thread([p, i]
 			{

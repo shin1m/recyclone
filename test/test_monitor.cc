@@ -10,14 +10,14 @@ int main(int argc, char* argv[])
 	t_engine_with_threads engine(options);
 	return engine.f_exit([&]
 	{
-		auto monitor = f_new<t_symbol>("monitor"sv);
+		auto RECYCLONE__SPILL monitor = f_new<t_symbol>("monitor"sv);
 		auto& mutex = monitor->f_extension()->v_mutex;
 		auto& condition = monitor->f_extension()->v_condition;
 		std::function<void()> action = []
 		{
 			f_epoch_point<t_type>();
 		};
-		::t_thread* worker;
+		::t_thread* RECYCLONE__SPILL worker;
 		{
 			f_epoch_region<t_type>([&]
 			{

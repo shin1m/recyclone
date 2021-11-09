@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 #else
 	options.v_verbose = options.v_verify = true;
 #endif
-	t_engine_with_finalizer engine(options, [](auto a_p)
+	t_engine_with_finalizer engine(options, [](auto RECYCLONE__SPILL a_p)
 	{
 		f_epoch_point<t_type>();
 		if (a_p->f_type() != &t_type_of<t_symbol>::v_instance) return;
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	f_padding([&]
 	{
 		f_epoch_point<t_type>();
-		auto x = f_new<t_symbol>("foo"sv);
+		auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, false);
 		assert(w->f_target() == x);
 	});
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
 	f_padding([&]
 	{
 		f_epoch_point<t_type>();
-		auto x = f_new<t_symbol>("bar"sv);
+		auto RECYCLONE__SPILL x = f_new<t_symbol>("bar"sv);
 		x->f_finalizee__(true);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
 		assert(w->f_target() == x);
@@ -59,9 +59,9 @@ int main(int argc, char* argv[])
 	f_padding([&]
 	{
 		f_epoch_point<t_type>();
-		auto x = f_new<t_symbol>("foo"sv);
+		auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
 		w = std::make_unique<t_weak_pointer<t_type>>(x, true);
-		auto y = f_new<t_symbol>("bar"sv);
+		auto RECYCLONE__SPILL y = f_new<t_symbol>("bar"sv);
 		w->f_target__(y);
 		assert(w->f_target() == y);
 	});

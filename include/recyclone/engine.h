@@ -476,12 +476,6 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 	v_instance->f_tick();
 }), v_options(a_options)
 {
-#ifdef __EMSCRIPTEN__
-	// Workaround to prevent runtime from exiting
-	// on calling emscripten_scan_registers()
-	// with PROXY_TO_PTHREAD & ASYNCIFY & EXIT_RUNTIME.
-	EM_ASM(runtimeKeepalivePush());
-#endif
 	v_instance = this;
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
@@ -538,9 +532,6 @@ t_engine<T_type>::~t_engine()
 	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
 	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
 #endif
-#endif
-#ifdef __EMSCRIPTEN__
-	EM_ASM(runtimeKeepalivePop());
 #endif
 	if (f_statistics() <= 0) return;
 	if (v_options.v_verbose) {

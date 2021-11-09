@@ -9,8 +9,8 @@ int main(int argc, char* argv[])
 	return engine.f_exit([]
 	{
 		f_epoch_point<t_type>();
-		auto p = f_new<t_pair>();
-		auto q = f_new<t_pair>(p);
+		auto RECYCLONE__SPILL p = f_new<t_pair>();
+		auto RECYCLONE__SPILL q = f_new<t_pair>(p);
 		p->v_tail = q;
 		return 0;
 	}());

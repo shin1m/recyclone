@@ -15,10 +15,8 @@
 #include <sys/resource.h>
 #endif
 #ifdef RECYCLONE__COOPERATIVE
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#else
 #ifdef __unix__
+#ifndef __EMSCRIPTEN__
 #include <ucontext.h>
 #endif
 #endif
@@ -111,10 +109,6 @@ class t_thread
 	void(*v_epoch__at)();
 	std::mutex v_epoch__mutex;
 	std::condition_variable v_epoch__done;
-#ifdef __EMSCRIPTEN__
-	void* v_registers_first;
-	void* v_registers_last;
-#endif
 #endif
 #ifdef __unix__
 	pthread_t v_handle;
@@ -154,19 +148,13 @@ class t_thread
 	template<typename T>
 	auto f_epoch_get(T a_do)
 	{
-#ifdef __EMSCRIPTEN__
-		emscripten_scan_registers([](auto a_first, auto a_last)
-		{
-			v_current->v_registers_first = a_first;
-			v_current->v_registers_last = a_last;
-		});
-		auto n = static_cast<char*>(v_registers_last) - static_cast<char*>(v_registers_first);
-		v_stack_top = reinterpret_cast<t_object<T_type>**>(alloca(n));
-		std::memcpy(v_stack_top, v_registers_first, n);
-#else
 #ifdef __unix__
+#ifdef __EMSCRIPTEN__
+		t_object<T_type>* context = nullptr;
+#else
 		ucontext_t context;
 		getcontext(&context);
+#endif
 #endif
 #ifdef _WIN32
 		CONTEXT context;
@@ -174,7 +162,6 @@ class t_thread
 		GetThreadContext(v_handle, &context);
 #endif
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(&context);
-#endif
 		f_epoch__get();
 		return a_do();
 	}

@@ -81,7 +81,7 @@ struct t_pair : t_object<t_type>
 	t_slot_of<t_object<t_type>> v_tail;
 
 	//! Called by t_type_of<t_pair>::f_new(...).
-	t_pair(t_object<t_type>* a_head = nullptr, t_object<t_type>* a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
+	t_pair(t_object<t_type>* RECYCLONE__SPILL a_head = nullptr, t_object<t_type>* RECYCLONE__SPILL a_tail = nullptr) : v_head(a_head), v_tail(a_tail)
 	{
 		f_epoch_point<t_type>();
 	}
@@ -102,9 +102,9 @@ int main(int argc, char* argv[])
 	return engine.f_exit([]
 	{
 		f_epoch_point<t_type>();
-		auto type_type = t_type_of<t_type>::f_initialize();
+		auto RECYCLONE__SPILL type_type = t_type_of<t_type>::f_initialize();
 		assert(type_type->f_type() == type_type);
-		auto type_pair = type_type->f_new<t_pair>();
+		auto RECYCLONE__SPILL type_pair = type_type->f_new<t_pair>();
 		assert(type_pair->f_type() == type_type);
 		assert(type_pair->f_new(type_pair->f_new(), type_pair->f_new())->f_type() == type_pair);
 		return 0;
