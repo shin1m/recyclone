@@ -151,7 +151,7 @@ public:
 
 	const t_options& v_options;
 
-	t_engine(const t_options& a_options);
+	t_engine(const t_options& a_options, void* a_bottom = nullptr);
 	~t_engine();
 	/*!
 	  Performs the exit sequence:
@@ -471,7 +471,7 @@ size_t t_engine<T_type>::f_statistics()
 }
 
 template<typename T_type>
-t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
+t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
 {
 	v_instance->f_tick();
 }), v_options(a_options)
@@ -499,10 +499,8 @@ t_engine<T_type>::t_engine(const t_options& a_options) : v_collector__threshold(
 #endif
 #endif
 	v_thread__main = new t_thread<T_type>();
-	v_thread__main->f_initialize(this);
-	std::unique_lock lock(v_collector__conductor.v_mutex);
+	v_thread__main->f_initialize(a_bottom ? a_bottom : this);
 	std::thread(&t_engine::f_collector, this).detach();
-	v_collector__conductor.f_wait(lock);
 }
 
 template<typename T_type>
