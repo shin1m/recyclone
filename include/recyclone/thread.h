@@ -27,12 +27,6 @@ namespace recyclone
 
 template<typename T_type>
 void f_epoch_point();
-#ifdef RECYCLONE__COOPERATIVE
-template<typename T_type>
-struct t_epoch_region;
-template<typename T_type>
-struct t_epoch_noiger;
-#endif
 template<typename T_type, typename T>
 auto f_epoch_region(T);
 
@@ -43,10 +37,6 @@ class t_thread
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
 	friend void f_epoch_point<T_type>();
-#ifdef RECYCLONE__COOPERATIVE
-	friend struct t_epoch_region<T_type>;
-	friend struct t_epoch_noiger<T_type>;
-#endif
 	template<typename, typename T> friend auto f_epoch_region(T);
 
 	static size_t f_page()
@@ -182,9 +172,6 @@ class t_thread
 			v_current->f_epoch_sleep();
 		});
 	}
-	RECYCLONE__NOINLINE void f_epoch_enter();
-	RECYCLONE__NOINLINE void f_epoch_leave();
-	RECYCLONE__NOINLINE void f_epoch_done();
 	void f_epoch_suspend()
 	{
 		std::unique_lock lock(v_epoch__mutex);
@@ -291,6 +278,11 @@ public:
 	{
 		return a_p >= v_stack_limit && a_p < static_cast<void*>(v_stack_bottom);
 	}
+#ifdef RECYCLONE__COOPERATIVE
+	RECYCLONE__NOINLINE void f_epoch_enter();
+	RECYCLONE__NOINLINE void f_epoch_leave();
+	RECYCLONE__NOINLINE void f_epoch_done();
+#endif
 };
 
 template<typename T_type>
@@ -409,11 +401,11 @@ struct t_epoch_region
 {
 	t_epoch_region()
 	{
-		t_thread<T_type>::v_current->f_epoch_enter();
+		t_thread<T_type>::f_current()->f_epoch_enter();
 	}
 	~t_epoch_region()
 	{
-		t_thread<T_type>::v_current->f_epoch_leave();
+		t_thread<T_type>::f_current()->f_epoch_leave();
 	}
 };
 
@@ -422,11 +414,11 @@ struct t_epoch_noiger
 {
 	t_epoch_noiger()
 	{
-		t_thread<T_type>::v_current->f_epoch_leave();
+		t_thread<T_type>::f_current()->f_epoch_leave();
 	}
 	~t_epoch_noiger()
 	{
-		t_thread<T_type>::v_current->f_epoch_done();
+		t_thread<T_type>::f_current()->f_epoch_done();
 	}
 };
 #endif
