@@ -16,7 +16,9 @@
 #endif
 #ifdef RECYCLONE__COOPERATIVE
 #ifdef __unix__
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+#include <emscripten/stack.h>
+#else
 #include <ucontext.h>
 #endif
 #endif
@@ -52,20 +54,20 @@ class t_thread
 	}
 	static size_t f_limit()
 	{
-#ifdef RECYCLONE__STACK_LIMIT
-		return RECYCLONE__STACK_LIMIT;
-#else
 #ifdef __unix__
+#ifdef __EMSCRIPTEN__
+		return emscripten_stack_get_base() - emscripten_stack_get_end();
+#else
 		rlimit limit;
 		if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
 		return limit.rlim_cur;
+#endif
 #endif
 #ifdef _WIN32
 		ULONG_PTR low;
 		ULONG_PTR high;
 		GetCurrentThreadStackLimits(&low, &high);
 		return high - low;
-#endif
 #endif
 	}
 
