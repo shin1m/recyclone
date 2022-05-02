@@ -1,8 +1,8 @@
 # Recyclone
 
-Recyclone is a C++ implementation of a modified version of David F. Bacon's [Recycler](http://www.research.ibm.com/people/d/dfb/papers/Bacon03Pure.pdf).
+Recyclone is a C++ implementation of a modified version of the Recycler described in the paper [A Pure Reference Counting Garbage Collector](http://www.research.ibm.com/people/d/dfb/papers/Bacon03Pure.pdf) by David F. Bacon, et al.
 
-It requires C++17 or later.
+It requires C++17.
 
 # Features
 
@@ -133,7 +133,7 @@ After the free cycles is completed, the buffered garbage objects are released.
 
 The MIT License (MIT)
 
-Copyright (c) 2021 Shin-ichi MORITA
+Copyright (c) 2021-2022 Shin-ichi MORITA
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
