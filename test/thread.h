@@ -6,23 +6,16 @@
 //! An example thread implementation.
 struct t_thread : t_object<t_type>
 {
-	const bool v_background;
 	//! Required by recyclone.
 	recyclone::t_thread<t_type>* v_internal = nullptr;
 
-	//! Called by f_new<t_thread>(...).
-	t_thread(bool a_background) : v_background(a_background)
+	//! To avoid zero initialization.
+	t_thread()
 	{
 	}
 	//! Called by t_type_of<t_thread>::f_scan(...).
 	void f_scan(t_scan<t_type>)
 	{
-	}
-	//! Called by recyclone::t_engine::f_start(...) on a new thread
-	//! after the thread has been initialized and before entering a_main.
-	void f_initialize()
-	{
-		v_internal->v_background = v_background;
 	}
 };
 
@@ -32,8 +25,11 @@ struct t_engine_with_threads : t_engine<t_type>
 	template<typename T>
 	::t_thread* f_start_thread(T a_main, bool a_background = false)
 	{
-		auto RECYCLONE__SPILL thread = f_new<::t_thread>(a_background);
-		f_start(thread, std::move(a_main));
+		auto RECYCLONE__SPILL thread = f_new<::t_thread>();
+		f_start(thread, [=]
+		{
+			thread->v_internal->v_background = a_background;
+		}, std::move(a_main));
 		return thread;
 	}
 };
@@ -42,11 +38,15 @@ struct t_engine_with_finalizer : t_engine_with_threads
 {
 	t_engine_with_finalizer(t_options& a_options, void(*a_finalize)(t_object<t_type>*)) : t_engine_with_threads(a_options)
 	{
-		// Finalizer is an instance of recyclone::t_thread.
-		v_thread__finalizer = f_start_thread([this, a_finalize]
+		auto RECYCLONE__SPILL thread = f_new<::t_thread>();
+		f_start(thread, [=]
+		{
+			// Finalizer is an instance of recyclone::t_thread.
+			v_thread__finalizer = thread->v_internal;
+		}, [=]
 		{
 			f_finalizer(a_finalize);
-		})->v_internal;
+		});
 	}
 };
 

@@ -316,7 +316,7 @@ t_extension<T_type>* t_object<T_type>::f_extension()
 	auto p = v_extension.load(std::memory_order_consume);
 	if (p) return p;
 	t_extension<T_type>* q = nullptr;
-	p = new t_extension<T_type>();
+	p = new t_extension<T_type>;
 	if (v_extension.compare_exchange_strong(q, p, std::memory_order_consume)) return p;
 	delete p;
 	return q;

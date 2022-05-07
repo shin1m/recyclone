@@ -208,8 +208,8 @@ public:
 		return v_exiting;
 	}
 	//! Starts a new thread that calls \p a_main for \p a_thread.
-	template<typename T_thread, typename T_main>
-	void f_start(T_thread* a_thread, T_main a_main);
+	template<typename T_thread, typename T_initialize, typename T_main>
+	void f_start(T_thread* a_thread, T_initialize a_initialize, T_main a_main);
 	//! Waits for \p a_thread to finish.
 	template<typename T_thread>
 	void f_join(T_thread* a_thread);
@@ -498,7 +498,7 @@ t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_colle
 	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
 #endif
 #endif
-	v_thread__main = new t_thread<T_type>();
+	v_thread__main = new t_thread<T_type>;
 	v_thread__main->f_initialize(a_bottom ? a_bottom : this);
 	std::thread(&t_engine::f_collector, this).detach();
 }
@@ -623,25 +623,27 @@ void t_engine<T_type>::f_finalize()
 }
 
 template<typename T_type>
-template<typename T_thread, typename T_main>
-void t_engine<T_type>::f_start(T_thread* a_thread, T_main a_main)
+template<typename T_thread, typename T_initialize, typename T_main>
+void t_engine<T_type>::f_start(T_thread* a_thread, T_initialize a_initialize, T_main a_main)
 {
+	// t_thread must be chained first in order to synchronize with f_exit().
 	f_epoch_region<T_type>([&, this]
 	{
 		std::lock_guard lock(v_thread__mutex);
+		if (v_exiting) throw std::runtime_error("engine is exiting.");
 		if (a_thread->v_internal) throw std::runtime_error("already started.");
-		a_thread->v_internal = new t_thread<T_type>();
+		a_thread->v_internal = new t_thread<T_type>;
 	});
 	t_slot<T_type>::t_increments::f_push(a_thread);
 	try {
-		std::thread([this, a_thread, main = std::move(a_main)]
+		std::thread([this, a_thread, initialize = std::move(a_initialize), main = std::move(a_main)]
 		{
 			v_instance = this;
 			auto internal = a_thread->v_internal;
 			{
 				std::lock_guard lock(v_thread__mutex);
 				internal->f_initialize(&internal);
-				a_thread->f_initialize();
+				initialize();
 				if (internal->v_background) v_thread__condition.notify_all();
 			}
 			try {

@@ -124,6 +124,7 @@ class t_thread
 	 */
 	t_object<T_type>* volatile* v_reviving = nullptr;
 
+	t_thread();
 #ifdef _WIN32
 	~t_thread()
 	{
@@ -258,7 +259,6 @@ public:
 	 */
 	bool v_background = false;
 
-	t_thread();
 	/*!
 	  Gets the running status of the thread.
 	  \return
@@ -286,6 +286,17 @@ public:
 	RECYCLONE__NOINLINE void f_epoch_done();
 #endif
 };
+
+template<typename T_type>
+t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
+{
+	auto limit = f_limit();
+	v_stack_buffer = std::make_unique<char[]>(limit * 2);
+	auto p = v_stack_buffer.get() + limit;
+	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
+	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
+	f_engine<T_type>()->v_thread__head = this;
+}
 
 template<typename T_type>
 void t_thread<T_type>::f_initialize(void* a_bottom)
@@ -351,18 +362,6 @@ void t_thread<T_type>::f_epoch()
 	v_increments.f_flush();
 	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
-}
-
-template<typename T_type>
-t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
-{
-	if (f_engine<T_type>()->v_exiting) throw std::runtime_error("engine is exiting.");
-	auto limit = f_limit();
-	v_stack_buffer = std::make_unique<char[]>(limit * 2);
-	auto p = v_stack_buffer.get() + limit;
-	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
-	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
-	f_engine<T_type>()->v_thread__head = this;
 }
 
 #ifdef RECYCLONE__COOPERATIVE
