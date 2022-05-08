@@ -20,4 +20,15 @@
 #define RECYCLONE__SPILL
 #endif
 
+#ifndef RECYCLONE__COOPERATIVE
+#ifdef __unix__
+#ifndef RECYCLONE__SIGNAL_SUSPEND
+#define RECYCLONE__SIGNAL_SUSPEND SIGRTMAX - 1
+#endif
+#ifndef RECYCLONE__SIGNAL_RESUME
+#define RECYCLONE__SIGNAL_RESUME SIGRTMAX
+#endif
+#endif
+#endif
+
 #endif

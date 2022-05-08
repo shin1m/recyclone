@@ -83,9 +83,9 @@ protected:
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	sem_t v_epoch__received;
-	sigset_t v_epoch__notsigusr2;
-	struct sigaction v_epoch__old_sigusr1;
-	struct sigaction v_epoch__old_sigusr2;
+	sigset_t v_epoch__not_signal_resume;
+	struct sigaction v_epoch__old_signal_suspend;
+	struct sigaction v_epoch__old_signal_resume;
 #endif
 #endif
 	t_thread<T_type>* v_thread__head = nullptr;
@@ -125,7 +125,7 @@ protected:
 	void f_epoch_suspend()
 	{
 		if (sem_post(&v_epoch__received) == -1) _exit(errno);
-		sigsuspend(&v_epoch__notsigusr2);
+		sigsuspend(&v_epoch__not_signal_resume);
 	}
 	void f_epoch_wait()
 	{
@@ -480,22 +480,22 @@ t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_colle
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	if (sem_init(&v_epoch__received, 0, 0) == -1) throw std::system_error(errno, std::generic_category());
-	sigfillset(&v_epoch__notsigusr2);
-	sigdelset(&v_epoch__notsigusr2, SIGUSR2);
+	sigfillset(&v_epoch__not_signal_resume);
+	sigdelset(&v_epoch__not_signal_resume, RECYCLONE__SIGNAL_RESUME);
 	struct sigaction sa;
 	sa.sa_handler = [](int)
 	{
 	};
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
-	if (sigaction(SIGUSR2, &sa, &v_epoch__old_sigusr2) == -1) throw std::system_error(errno, std::generic_category());
+	if (sigaction(RECYCLONE__SIGNAL_RESUME, &sa, &v_epoch__old_signal_resume) == -1) throw std::system_error(errno, std::generic_category());
 	sa.sa_handler = [](int)
 	{
 		t_thread<T_type>::v_current->f_epoch_get();
 		v_instance->f_epoch_suspend();
 	};
-	sigaddset(&sa.sa_mask, SIGUSR2);
-	if (sigaction(SIGUSR1, &sa, &v_epoch__old_sigusr1) == -1) throw std::system_error(errno, std::generic_category());
+	sigaddset(&sa.sa_mask, RECYCLONE__SIGNAL_RESUME);
+	if (sigaction(RECYCLONE__SIGNAL_SUSPEND, &sa, &v_epoch__old_signal_suspend) == -1) throw std::system_error(errno, std::generic_category());
 #endif
 #endif
 	v_thread__main = new t_thread<T_type>;
@@ -527,8 +527,8 @@ t_engine<T_type>::~t_engine()
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
 	if (sem_destroy(&v_epoch__received) == -1) std::exit(errno);
-	if (sigaction(SIGUSR1, &v_epoch__old_sigusr1, NULL) == -1) std::exit(errno);
-	if (sigaction(SIGUSR2, &v_epoch__old_sigusr2, NULL) == -1) std::exit(errno);
+	if (sigaction(RECYCLONE__SIGNAL_SUSPEND, &v_epoch__old_signal_suspend, NULL) == -1) std::exit(errno);
+	if (sigaction(RECYCLONE__SIGNAL_RESUME, &v_epoch__old_signal_resume, NULL) == -1) std::exit(errno);
 #endif
 #endif
 	if (f_statistics() <= 0) return;

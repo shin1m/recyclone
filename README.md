@@ -31,11 +31,13 @@ It requires C++17.
 
 ## Preemptive Suspension
 
-This mode uses SIGUSR1 & SIGUSR2 or SuspendThread().
+This mode uses POSIX signals or SuspendThread & ResumeThread for Windows.
+
+For POSIX signals, SIGRTMAX - 1 & SIGRTMAX are used by default.
 
 ## Cooperative Suspension
 
-This mode uses epoch points and epoch regions which does not require signals.
+This mode uses epoch points and epoch regions which does not require POSIX signals.
 
 # How to
 
