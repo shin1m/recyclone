@@ -11,7 +11,7 @@ namespace recyclone
 template<typename> class t_extension;
 
 template<typename T_type>
-using t_scan = void(*)(t_slot<T_type>&);
+using t_scan = void(*)(t_object<T_type>*);
 
 enum t_color : char
 {
@@ -55,17 +55,9 @@ class t_object
 		v_scan_stack = a_p;
 	}
 	template<void (t_object::*A_push)()>
-	static void f_push(t_slot<T_type>& a_slot)
+	static void f_push(t_object* a_p)
 	{
-		if (auto p = a_slot.v_p.load(std::memory_order_relaxed)) p->template f_push<A_push>();
-	}
-	template<void (t_object::*A_push)()>
-	static void f_push_and_clear(t_slot<T_type>& a_slot)
-	{
-		auto p = a_slot.v_p.load(std::memory_order_relaxed);
-		if (!p) return;
-		p->template f_push<A_push>();
-		a_slot.v_p.store(nullptr, std::memory_order_relaxed);
+		if (a_p) a_p->template f_push<A_push>();
 	}
 
 	t_object* v_next;
@@ -130,11 +122,11 @@ class t_object
 	void f_decrement_step()
 	{
 		if (auto p = v_extension.load(std::memory_order_consume)) {
-			p->f_scan(f_push_and_clear<&t_object::f_decrement_push>);
+			p->f_scan(f_push<&t_object::f_decrement_push>);
 			v_extension.store(nullptr, std::memory_order_relaxed);
 			delete p;
 		}
-		v_type->f_finalize(this, f_push_and_clear<&t_object::f_decrement_push>);
+		v_type->f_finalize(this, f_push<&t_object::f_decrement_push>);
 		v_type->f_decrement_push();
 		v_type = nullptr;
 		v_color = e_color__BLACK;
@@ -242,11 +234,11 @@ class t_object
 	void f_cyclic_decrement()
 	{
 		if (auto p = v_extension.load(std::memory_order_consume)) {
-			p->f_scan(f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+			p->f_scan(f_push<&t_object::f_cyclic_decrement_push>);
 			v_extension.store(nullptr, std::memory_order_relaxed);
 			delete p;
 		}
-		v_type->f_finalize(this, f_push_and_clear<&t_object::f_cyclic_decrement_push>);
+		v_type->f_finalize(this, f_push<&t_object::f_cyclic_decrement_push>);
 		v_type->f_cyclic_decrement_push();
 		v_type = nullptr;
 	}
