@@ -124,7 +124,10 @@ class t_thread
 	 */
 	t_object<T_type>* volatile* v_reviving = nullptr;
 
-	t_thread();
+	t_thread() : v_next(f_engine<T_type>()->v_thread__head)
+	{
+		f_engine<T_type>()->v_thread__head = this;
+	}
 #ifdef _WIN32
 	~t_thread()
 	{
@@ -288,17 +291,6 @@ public:
 };
 
 template<typename T_type>
-t_thread<T_type>::t_thread() : v_next(f_engine<T_type>()->v_thread__head)
-{
-	auto limit = f_limit();
-	v_stack_buffer = std::make_unique<char[]>(limit * 2);
-	auto p = v_stack_buffer.get() + limit;
-	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
-	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
-	f_engine<T_type>()->v_thread__head = this;
-}
-
-template<typename T_type>
 void t_thread<T_type>::f_initialize(void* a_bottom)
 {
 #ifdef __unix__
@@ -307,9 +299,14 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 #ifdef _WIN32
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
 #endif
+	auto limit = f_limit();
+	v_stack_buffer = std::make_unique<char[]>(limit * 2);
+	auto p = v_stack_buffer.get() + limit;
+	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
+	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
 	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
 	auto page = f_page();
-	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - f_limit());
+	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit);
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
 	v_increments.v_head = v_increments.v_objects;

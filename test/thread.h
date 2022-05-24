@@ -23,13 +23,13 @@ struct t_engine_with_threads : t_engine<t_type>
 {
 	using t_engine<t_type>::t_engine;
 	template<typename T>
-	::t_thread* f_start_thread(T a_main, bool a_background = false)
+	::t_thread* f_start_thread(T&& a_main, bool a_background = false)
 	{
 		auto RECYCLONE__SPILL thread = f_new<::t_thread>();
 		f_start(thread, [=]
 		{
 			thread->v_internal->v_background = a_background;
-		}, std::move(a_main));
+		}, std::forward<T>(a_main));
 		return thread;
 	}
 };
