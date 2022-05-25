@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 			std::printf("resurrected: %s\n", s.c_str());
 		});
 #ifndef NDEBUG
-		assert(static_cast<t_object<t_type>*>(v_resurrected));
+		assert(v_resurrected);
 #endif
 		v_resurrected = nullptr;
 	});

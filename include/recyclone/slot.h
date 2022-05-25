@@ -140,6 +140,10 @@ public:
 	{
 		if (auto p = v_p.load(std::memory_order_relaxed)) t_decrements::f_push(p);
 	}
+	operator bool() const
+	{
+		return v_p.load(std::memory_order_relaxed);
+	}
 	operator t_object<T_type>*() const
 	{
 		return v_p.load(std::memory_order_relaxed);
