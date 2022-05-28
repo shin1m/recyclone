@@ -38,15 +38,11 @@ struct t_engine_with_finalizer : t_engine_with_threads
 {
 	t_engine_with_finalizer(t_options& a_options, void(*a_finalize)(t_object<t_type>*)) : t_engine_with_threads(a_options)
 	{
-		auto RECYCLONE__SPILL thread = f_new<::t_thread>();
-		f_start(thread, [=]
-		{
-			// Finalizer is an instance of recyclone::t_thread.
-			v_thread__finalizer = thread->v_internal;
-		}, [=]
+		// Finalizer is an instance of recyclone::t_thread.
+		v_thread__finalizer = f_start_thread([=]
 		{
 			f_finalizer(a_finalize);
-		});
+		})->v_internal;
 	}
 };
 
