@@ -52,6 +52,8 @@ void f_padding(T_do a_do)
 	char padding[4096];
 	std::memset(padding, 0, sizeof(padding));
 	a_do();
+	// TODO: Workaround for Clang Debug build.
+	std::snprintf(nullptr, 0, "");
 }
 
 #endif

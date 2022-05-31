@@ -25,20 +25,37 @@ class t_weak_pointer : t_weak_pointers<T_type>
 	friend class t_extension<T_type>;
 
 	t_object<T_type>* v_target;
+	t_object<T_type>* v_dependent = nullptr;
 
+	template<typename T>
+	auto f_reviving(T a_do) const
+	{
+		f_engine<T_type>()->v_object__reviving__mutex.lock();
+		auto p = v_target;
+		if (p) {
+			f_engine<T_type>()->v_object__reviving = true;
+			t_thread<T_type>::v_current->f_revive();
+		}
+		auto x = a_do();
+		f_engine<T_type>()->v_object__reviving__mutex.unlock();
+		if (p) {
+			t_slot<T_type>::t_increments::f_push(p);
+			t_slot<T_type>::t_decrements::f_push(p);
+		}
+		return x;
+	}
 	void f_attach(t_root<t_slot<T_type>>& a_target);
 	t_object<T_type>* f_detach();
 
 public:
-	const bool v_final;
+	const bool v_final = false;
 
 	t_weak_pointer(t_object<T_type>* a_target, bool a_final);
+	t_weak_pointer(t_object<T_type>* a_target, t_object<T_type>* a_dependent);
 	~t_weak_pointer();
-	t_object<T_type>* f_target() const;
+	std::pair<t_object<T_type>*, t_object<T_type>*> f_get() const;
 	void f_target__(t_object<T_type>* a_p);
-	virtual void f_scan(t_scan<T_type> a_scan)
-	{
-	}
+	void f_dependent__(t_object<T_type>* a_p);
 };
 
 template<typename T_type>
@@ -62,8 +79,7 @@ t_object<T_type>* t_weak_pointer<T_type>::f_detach()
 	std::lock_guard lock(extension->v_weak_pointers__mutex);
 	this->v_previous->v_next = this->v_next;
 	this->v_next->v_previous = this->v_previous;
-	if (extension->v_weak_pointers.v_next == &extension->v_weak_pointers) return extension->v_weak_pointers__cycle.v_p.exchange(nullptr, std::memory_order_relaxed);
-	return nullptr;
+	return extension->v_weak_pointers.v_next == &extension->v_weak_pointers ? extension->v_weak_pointers__cycle.v_p.exchange(nullptr, std::memory_order_relaxed) : nullptr;
 }
 
 template<typename T_type>
@@ -75,35 +91,60 @@ t_weak_pointer<T_type>::t_weak_pointer(t_object<T_type>* a_target, bool a_final)
 }
 
 template<typename T_type>
-t_weak_pointer<T_type>::~t_weak_pointer()
+t_weak_pointer<T_type>::t_weak_pointer(t_object<T_type>* a_target, t_object<T_type>* a_dependent)
 {
-	f_engine<T_type>()->v_object__reviving__mutex.lock();
-	auto p = f_detach();
-	f_engine<T_type>()->v_object__reviving__mutex.unlock();
-	if (p) t_slot<T_type>::t_decrements::f_push(p);
+	if (!a_target) a_dependent = nullptr;
+	if (a_dependent) t_slot<T_type>::t_increments::f_push(a_dependent);
+	t_root<t_slot<T_type>> p = a_target;
+	std::lock_guard lock(f_engine<T_type>()->v_object__reviving__mutex);
+	f_attach(p);
+	v_dependent = a_dependent;
 }
 
 template<typename T_type>
-t_object<T_type>* t_weak_pointer<T_type>::f_target() const
+t_weak_pointer<T_type>::~t_weak_pointer()
 {
-	f_engine<T_type>()->v_object__reviving__mutex.lock();
-	f_engine<T_type>()->v_object__reviving = true;
-	t_thread<T_type>::v_current->f_revive();
-	auto p = v_target;
-	f_engine<T_type>()->v_object__reviving__mutex.unlock();
-	return t_root<t_slot<T_type>>(p);
+	auto [p, q] = f_reviving([&]
+	{
+		return std::make_pair(f_detach(), v_dependent);
+	});
+	if (p) t_slot<T_type>::t_decrements::f_push(p);
+	if (q) t_slot<T_type>::t_decrements::f_push(q);
+}
+
+template<typename T_type>
+std::pair<t_object<T_type>*, t_object<T_type>*> t_weak_pointer<T_type>::f_get() const
+{
+	return f_reviving([&]
+	{
+		return std::make_pair(v_target, v_dependent);
+	});
 }
 
 template<typename T_type>
 void t_weak_pointer<T_type>::f_target__(t_object<T_type>* a_p)
 {
+	t_root<t_slot<T_type>> dependent;
 	t_root<t_slot<T_type>> p = a_p;
-	f_engine<T_type>()->v_object__reviving__mutex.lock();
-	auto q = f_detach();
-	v_target = a_p;
-	f_attach(p);
-	f_engine<T_type>()->v_object__reviving__mutex.unlock();
-	if (q) t_slot<T_type>::t_decrements::f_push(q);
+	if (auto q = f_reviving([&]
+	{
+		if (!a_p) v_dependent = dependent.v_p.exchange(v_dependent, std::memory_order_relaxed);
+		auto r = f_detach();
+		f_attach(p);
+		return r;
+	})) t_slot<T_type>::t_decrements::f_push(q);
+}
+
+template<typename T_type>
+void t_weak_pointer<T_type>::f_dependent__(t_object<T_type>* a_p)
+{
+	if (v_final) throw std::runtime_error("cannot have a dependent.");
+	t_root<t_slot<T_type>> dependent = a_p;
+	f_reviving([&]
+	{
+		if (v_target) v_dependent = dependent.v_p.exchange(v_dependent, std::memory_order_relaxed);
+		return false;
+	});
 }
 
 template<typename T_type>
@@ -129,7 +170,7 @@ public:
 template<typename T_type>
 t_extension<T_type>::~t_extension()
 {
-	for (auto p = v_weak_pointers.v_next; p != &v_weak_pointers; p = p->v_next) p->v_target = nullptr;
+	for (auto p = v_weak_pointers.v_next; p != &v_weak_pointers; p = p->v_next) p->v_target = p->v_dependent = nullptr;
 }
 
 template<typename T_type>
@@ -137,7 +178,7 @@ void t_extension<T_type>::f_detach()
 {
 	for (auto p = v_weak_pointers.v_next; p != &v_weak_pointers; p = p->v_next) {
 		if (p->v_final) continue;
-		p->v_target = nullptr;
+		p->v_target = p->v_dependent = nullptr;
 		p->v_previous->v_next = p->v_next;
 		p->v_next->v_previous = p->v_previous;
 	}
@@ -148,7 +189,7 @@ void t_extension<T_type>::f_scan(t_scan<T_type> a_scan)
 {
 	std::lock_guard lock(v_weak_pointers__mutex);
 	a_scan(v_weak_pointers__cycle);
-	for (auto p = v_weak_pointers.v_next; p != &v_weak_pointers; p = p->v_next) p->f_scan(a_scan);
+	for (auto p = v_weak_pointers.v_next; p != &v_weak_pointers; p = p->v_next) a_scan(p->v_dependent);
 }
 
 }
