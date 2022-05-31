@@ -19,7 +19,7 @@ It requires C++17.
   * The collector only stops one thread at a time for a short period of time.
   * Each thread does not need to wait unless increment/decrement queues are full or the object free list is empty.
 * Header only
-* Small - less than 2K lines of code.
+* Small - about 2K lines of code.
 
 # Downsides
 
