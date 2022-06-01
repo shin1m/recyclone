@@ -35,4 +35,4 @@ jobs:
         run: cmake --build . --config ${{matrix.configuration}}
       - name: Test
         working-directory: build
-        run: ctest -C ${{matrix.configuration}}
+        run: ctest -C ${{matrix.configuration}} -VV
