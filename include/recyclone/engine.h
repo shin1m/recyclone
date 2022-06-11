@@ -88,6 +88,8 @@ protected:
 	struct sigaction v_epoch__old_signal_resume;
 #endif
 #endif
+	std::unique_ptr<t_object<T_type>*[]> v_stack__copy;
+	size_t v_stack__copy_size = 0;
 	t_thread<T_type>* v_thread__head = nullptr;
 	t_thread<T_type>* v_thread__main;
 	t_thread<T_type>* v_thread__finalizer = nullptr;
@@ -234,6 +236,12 @@ void t_engine<T_type>::f_collector()
 		}
 		{
 			std::lock_guard lock(v_thread__mutex);
+			size_t stack = 0;
+			for (auto p = v_thread__head; p; p = p->v_next) if (p->v_done >= 0 && p->v_stack_last_size > stack) stack = p->v_stack_last_size;
+			if (stack != v_stack__copy_size) {
+				v_stack__copy.reset(new t_object<T_type>*[stack]);
+				v_stack__copy_size = stack;
+			}
 			for (auto p = &v_thread__head; *p;) {
 				auto q = *p;
 				auto active = q->v_done >= 0;

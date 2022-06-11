@@ -108,15 +108,16 @@ class t_thread
 #ifdef _WIN32
 	HANDLE v_handle = NULL;
 #endif
-	std::unique_ptr<char[]> v_stack_buffer;
+	//! Copied stack of the last epoch.
+	std::unique_ptr<t_object<T_type>*[]> v_stack_last;
+	size_t v_stack_last_size;
+	//! Top of the copied stack of the last epoch.
 	t_object<T_type>** v_stack_last_top;
-	//! Bottom of the copied stack of the last epoch.
-	t_object<T_type>** v_stack_last_bottom;
-	//! Bottom of the copied stack.
-	t_object<T_type>** v_stack_copy;
 	//! Bottom of the real stack.
 	t_object<T_type>** v_stack_bottom;
+	//! Top limit of the real stack.
 	void* v_stack_limit;
+	//! Current top of the real stack.
 	t_object<T_type>** v_stack_top;
 	/*!
 	  Point at which reviving occurred.
@@ -300,10 +301,9 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
 #endif
 	auto limit = f_limit();
-	v_stack_buffer = std::make_unique<char[]>(limit * 2);
-	auto p = v_stack_buffer.get() + limit;
-	v_stack_last_top = v_stack_last_bottom = reinterpret_cast<t_object<T_type>**>(p);
-	v_stack_copy = reinterpret_cast<t_object<T_type>**>(p + limit);
+	v_stack_last_size = limit / sizeof(t_object<T_type>*);
+	v_stack_last.reset(new t_object<T_type>*[v_stack_last_size]);
+	v_stack_last_top = v_stack_last.get() + v_stack_last_size;
 	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
 	auto page = f_page();
 	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit);
@@ -320,8 +320,9 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 template<typename T_type>
 void t_thread<T_type>::f_epoch()
 {
-	auto top0 = v_stack_copy;
-	auto top1 = v_stack_last_bottom;
+	auto bottom0 = f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size;
+	auto top0 = bottom0;
+	auto top1 = v_stack_last.get() + v_stack_last_size;
 	if (v_done > 0) {
 		++v_done;
 	} else {
@@ -332,7 +333,7 @@ void t_thread<T_type>::f_epoch()
 		f_epoch_resume();
 		top1 -= n;
 	}
-	auto decrements = v_stack_last_bottom;
+	auto decrements = f_engine<T_type>()->v_stack__copy.get();
 	{
 		auto top2 = v_stack_last_top;
 		v_stack_last_top = top1;
@@ -345,7 +346,7 @@ void t_thread<T_type>::f_epoch()
 			} while (top1 < top2);
 		else
 			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
-		for (; top0 < v_stack_copy; ++top1) {
+		for (; top0 < bottom0; ++top1) {
 			auto p = *top0++;
 			auto q = *top1;
 			if (p == q) continue;
@@ -357,7 +358,7 @@ void t_thread<T_type>::f_epoch()
 		}
 	}
 	v_increments.f_flush();
-	for (auto p = v_stack_last_bottom; p != decrements; ++p) (*p)->f_decrement();
+	for (auto p = f_engine<T_type>()->v_stack__copy.get(); p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
 }
 
