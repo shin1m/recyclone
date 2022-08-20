@@ -520,15 +520,9 @@ t_engine<T_type>::~t_engine()
 		++v_thread__main->v_done;
 	}
 #ifdef RECYCLONE__COOPERATIVE
-	f__wait();
-	f__wait();
-	f__wait();
-	f__wait();
+	for (size_t i = 0; i < 4; ++i) f__wait();
 #else
-	f_wait();
-	f_wait();
-	f_wait();
-	f_wait();
+	for (size_t i = 0; i < 4; ++i) f_wait();
 #endif
 	v_collector__conductor.f_quit();
 	assert(!v_thread__head);
