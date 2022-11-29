@@ -48,7 +48,7 @@ class t_heap
 		std::atomic<T*> v_chunks = nullptr;
 		std::atomic_size_t v_grown = 0;
 		std::atomic_size_t v_allocated = 0;
-		size_t v_returned = 0;
+		std::atomic_size_t v_returned = 0;
 		size_t v_freed = 0;
 
 		T* f_grow(t_heap& a_heap)
@@ -87,7 +87,7 @@ class t_heap
 			p->v_chunk_next = v_chunks.load(std::memory_order_relaxed);
 			while (!v_chunks.compare_exchange_weak(p->v_chunk_next, p, std::memory_order_release));
 			v_head<A_rank> = nullptr;
-			v_returned += a_n;
+			v_returned.fetch_add(a_n, std::memory_order_relaxed);
 		}
 		void f_return()
 		{
@@ -108,7 +108,7 @@ class t_heap
 		}
 		size_t f_live() const
 		{
-			return v_allocated.load(std::memory_order_relaxed) - v_returned - v_freed;
+			return v_allocated.load(std::memory_order_relaxed) - v_returned.load(std::memory_order_relaxed) - v_freed;
 		}
 	};
 
@@ -163,13 +163,13 @@ public:
 	template<typename T_each>
 	void f_statistics(T_each a_each) const
 	{
-		a_each(size_t(0), v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned);
-		a_each(size_t(1), v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned);
-		a_each(size_t(2), v_of2.v_grown.load(std::memory_order_relaxed), v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned);
-		a_each(size_t(3), v_of3.v_grown.load(std::memory_order_relaxed), v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned);
-		a_each(size_t(4), v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned);
-		a_each(size_t(5), v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned);
-		a_each(size_t(6), v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned);
+		a_each(size_t(0), v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(1), v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(2), v_of2.v_grown.load(std::memory_order_relaxed), v_of2.v_allocated.load(std::memory_order_relaxed), v_of2.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(3), v_of3.v_grown.load(std::memory_order_relaxed), v_of3.v_allocated.load(std::memory_order_relaxed), v_of3.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(4), v_of4.v_grown.load(std::memory_order_relaxed), v_of4.v_allocated.load(std::memory_order_relaxed), v_of4.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(5), v_of5.v_grown.load(std::memory_order_relaxed), v_of5.v_allocated.load(std::memory_order_relaxed), v_of5.v_returned.load(std::memory_order_relaxed));
+		a_each(size_t(6), v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned.load(std::memory_order_relaxed));
 		a_each(size_t(V_RANKX), size_t(0), v_allocated, v_freed);
 	}
 	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)

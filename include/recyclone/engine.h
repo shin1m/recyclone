@@ -575,10 +575,7 @@ int t_engine<T_type>::f_exit(int a_code)
 			if (v_collector__full++ <= 0) v_collector__threshold = 0;
 		}
 		if (!v_thread__finalizer) return a_code;
-		f_wait();
-		f_wait();
-		f_wait();
-		f_wait();
+		for (size_t i = 0; i < 4; ++i) f_wait();
 		f_finalize();
 		assert(v_thread__head == v_thread__finalizer);
 		f_epoch_region<T_type>([this]
