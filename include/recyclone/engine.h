@@ -67,12 +67,11 @@ protected:
 	static inline RECYCLONE__THREAD t_engine* v_instance;
 
 	t_conductor v_collector__conductor;
-	size_t v_collector__threshold;
 	size_t v_collector__tick = 0;
 	size_t v_collector__wait = 0;
 	size_t v_collector__epoch = 0;
 	size_t v_collector__collect = 0;
-	size_t v_collector__full = 0;
+	std::atomic_size_t v_collector__full = 0;
 	t_object<T_type>* v_cycles = nullptr;
 	t_heap<t_object<T_type>> v_object__heap;
 	size_t v_object__lower = 0;
@@ -359,7 +358,7 @@ void t_engine<T_type>::f_collector()
 		if (roots->v_next != roots) {
 			auto live = v_object__heap.f_live();
 			if (live < v_object__lower) v_object__lower = live;
-			if (live - v_object__lower >= v_collector__threshold) {
+			if (v_collector__full.load(std::memory_order_relaxed) > 0 || live - v_object__lower >= v_options.v_collector__threshold) {
 				v_object__lower = live;
 				++v_collector__collect;
 				{
@@ -490,7 +489,7 @@ size_t t_engine<T_type>::f_statistics()
 }
 
 template<typename T_type>
-t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_collector__threshold(a_options.v_collector__threshold), v_object__heap([]
+t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_object__heap([]
 {
 	v_instance->f_tick();
 }), v_options(a_options)
@@ -576,10 +575,7 @@ int t_engine<T_type>::f_exit(int a_code)
 		v_exiting = true;
 	});
 	if (v_options.v_verify) {
-		{
-			std::lock_guard lock(v_collector__conductor.v_mutex);
-			if (v_collector__full++ <= 0) v_collector__threshold = 0;
-		}
+		v_collector__full.fetch_add(1, std::memory_order_relaxed);
 		if (!v_thread__finalizer) return a_code;
 		for (size_t i = 0; i < 4; ++i) f_wait();
 		f_finalize();
@@ -600,18 +596,12 @@ int t_engine<T_type>::f_exit(int a_code)
 template<typename T_type>
 void t_engine<T_type>::f_collect()
 {
-	{
-		std::lock_guard lock(v_collector__conductor.v_mutex);
-		if (v_collector__full++ <= 0) v_collector__threshold = 0;
-	}
+	v_collector__full.fetch_add(1, std::memory_order_relaxed);
 	f_wait();
 	f_wait();
 	f_wait();
 	f_wait();
-	{
-		std::lock_guard lock(v_collector__conductor.v_mutex);
-		if (--v_collector__full <= 0) v_collector__threshold = v_options.v_collector__threshold;
-	}
+	v_collector__full.fetch_sub(1, std::memory_order_relaxed);
 }
 
 template<typename T_type>
