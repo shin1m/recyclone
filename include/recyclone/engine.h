@@ -137,6 +137,7 @@ protected:
 #endif
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object<T_type>*));
+	void f_finalize(t_thread<T_type>* a_thread);
 	size_t f_statistics();
 
 public:
@@ -460,6 +461,16 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 }
 
 template<typename T_type>
+void t_engine<T_type>::f_finalize(t_thread<T_type>* a_thread)
+{
+	v_object__heap.f_return();
+	a_thread->f_epoch_done();
+	std::lock_guard lock(v_thread__mutex);
+	++a_thread->v_done;
+	v_thread__condition.notify_all();
+}
+
+template<typename T_type>
 size_t t_engine<T_type>::f_statistics()
 {
 	if (v_options.v_verbose) std::fprintf(stderr, "statistics:\n\tt_object:\n");
@@ -514,11 +525,7 @@ t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_colle
 template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
-	{
-		v_thread__main->f_epoch_done();
-		std::lock_guard lock(v_thread__mutex);
-		++v_thread__main->v_done;
-	}
+	f_finalize(v_thread__main);
 #ifdef RECYCLONE__COOPERATIVE
 	for (size_t i = 0; i < 4; ++i) f__wait();
 #else
@@ -569,7 +576,6 @@ int t_engine<T_type>::f_exit(int a_code)
 		v_exiting = true;
 	});
 	if (v_options.v_verify) {
-		v_object__heap.f_return();
 		{
 			std::lock_guard lock(v_collector__conductor.v_mutex);
 			if (v_collector__full++ <= 0) v_collector__threshold = 0;
@@ -649,7 +655,6 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_initialize a_initialize, T_
 				main();
 			} catch (...) {
 			}
-			v_object__heap.f_return();
 			f_epoch_region<T_type>([&, this]
 			{
 				std::lock_guard lock(v_thread__mutex);
@@ -657,10 +662,7 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_initialize a_initialize, T_
 				a_thread->v_internal = nullptr;
 			});
 			t_slot<T_type>::t_decrements::f_push(a_thread);
-			internal->f_epoch_done();
-			std::lock_guard lock(v_thread__mutex);
-			++internal->v_done;
-			v_thread__condition.notify_all();
+			f_finalize(internal);
 		}).detach();
 	} catch (...) {
 		f_epoch_region<T_type>([&, this]
