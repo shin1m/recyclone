@@ -306,7 +306,7 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 	v_stack_last_top = v_stack_last.get() + v_stack_last_size;
 	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
 	auto page = f_page();
-	v_stack_limit = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(a_bottom) / page * page + page - limit);
+	v_stack_limit = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(a_bottom) + page - 1) / page * page - limit);
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
 	v_increments.v_head = v_increments.v_objects;
