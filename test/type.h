@@ -62,12 +62,12 @@ struct t_type_of : t_type
 template<typename T>
 t_type_of<T> t_type_of<T>::v_instance;
 
-template<typename T, typename... T_an>
-T* f_new(T_an&&... a_n)
+template<typename T>
+T* f_new(auto&&... a_xs)
 {
 	f_epoch_point<t_type>();
 	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
-	new(p) T(std::forward<T_an>(a_n)...);
+	new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
 	// Finishes object construction.
 	p->f_be(&t_type_of<T>::v_instance);
 	return p;

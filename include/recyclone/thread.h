@@ -2,9 +2,6 @@
 #define RECYCLONE__THREAD_H
 
 #include "object.h"
-#ifdef RECYCLONE__COOPERATIVE
-#include <condition_variable>
-#endif
 #include <thread>
 #ifndef RECYCLONE__COOPERATIVE
 #include <csignal>
@@ -29,8 +26,8 @@ namespace recyclone
 
 template<typename T_type>
 void f_epoch_point();
-template<typename T_type, typename T>
-auto f_epoch_region(T);
+template<typename T_type>
+auto f_epoch_region(auto);
 
 //! A set of thread data for garbage collection.
 template<typename T_type>
@@ -39,7 +36,7 @@ class t_thread
 	friend class t_engine<T_type>;
 	friend class t_weak_pointer<T_type>;
 	friend void f_epoch_point<T_type>();
-	template<typename, typename T> friend auto f_epoch_region(T);
+	template<typename> friend auto f_epoch_region(auto);
 
 	static size_t f_page()
 	{
@@ -99,8 +96,6 @@ class t_thread
 	    - f_epoch_on: epoch region
 	 */
 	void(*v_epoch__at)();
-	std::mutex v_epoch__mutex;
-	std::condition_variable v_epoch__done;
 #endif
 #ifdef __unix__
 	pthread_t v_handle;
@@ -142,8 +137,7 @@ class t_thread
 		v_decrements.v_epoch.store(v_decrements.v_head, std::memory_order_release);
 	}
 #ifdef RECYCLONE__COOPERATIVE
-	template<typename T>
-	auto f_epoch_get(T a_do)
+	auto f_epoch_get(auto a_do)
 	{
 #ifdef __unix__
 #ifdef __EMSCRIPTEN__
@@ -167,10 +161,9 @@ class t_thread
 	}
 	void f_epoch_sleep()
 	{
-		std::unique_lock lock(v_epoch__mutex);
 		v_epoch__poll.store(nullptr, std::memory_order_release);
-		v_epoch__done.notify_one();
-		do v_epoch__done.wait(lock); while (!v_epoch__poll.load(std::memory_order_relaxed));
+		v_epoch__poll.notify_one();
+		v_epoch__poll.wait(nullptr, std::memory_order_relaxed);
 	}
 	static void f_epoch_on()
 	{
@@ -181,11 +174,10 @@ class t_thread
 	}
 	void f_epoch_suspend()
 	{
-		std::unique_lock lock(v_epoch__mutex);
 		while (true) {
 			v_epoch__at = f_epoch_off;
 			if (v_epoch__poll.compare_exchange_strong(v_epoch__at, f_epoch_on, std::memory_order_relaxed, std::memory_order_relaxed)) {
-				do v_epoch__done.wait(lock); while (v_epoch__poll.load(std::memory_order_acquire));
+				v_epoch__poll.wait(f_epoch_on, std::memory_order_acquire);
 				break;
 			}
 			v_epoch__at = f_epoch_on;
@@ -194,9 +186,8 @@ class t_thread
 	}
 	void f_epoch_resume()
 	{
-		std::unique_lock lock(v_epoch__mutex);
 		v_epoch__poll.store(v_epoch__at, std::memory_order_relaxed);
-		v_epoch__done.notify_one();
+		v_epoch__poll.notify_one();
 	}
 #else
 	void f_epoch_get()
@@ -376,13 +367,10 @@ void t_thread<T_type>::f_epoch_enter()
 template<typename T_type>
 void t_thread<T_type>::f_epoch_leave()
 {
-	auto p = f_epoch_on;
-	if (v_epoch__poll.compare_exchange_strong(p, f_epoch_off, std::memory_order_relaxed, std::memory_order_relaxed)) return;
-	std::unique_lock lock(v_epoch__mutex);
 	while (true) {
 		auto p = f_epoch_on;
 		if (v_epoch__poll.compare_exchange_strong(p, f_epoch_off, std::memory_order_relaxed, std::memory_order_relaxed)) break;
-		v_epoch__done.wait(lock);
+		v_epoch__poll.wait(p, std::memory_order_relaxed);
 	}
 }
 
@@ -444,8 +432,8 @@ inline void f_epoch_point()
   For each blocking operation, this should be placed surrounding it.
   The object graph must not be manipulated inside the region.
  */
-template<typename T_type, typename T>
-RECYCLONE__NOINLINE auto f_epoch_region(T a_do)
+template<typename T_type>
+RECYCLONE__NOINLINE auto f_epoch_region(auto a_do)
 {
 	return t_thread<T_type>::v_current->f_epoch_get([&]
 	{
@@ -457,20 +445,20 @@ RECYCLONE__NOINLINE auto f_epoch_region(T a_do)
 /*!
   Inside the epoch region, this establishes an inverse region inside which the object graph can be manipulated.
  */
-template<typename T_type, typename T>
-RECYCLONE__NOINLINE auto f_epoch_noiger(T a_do)
+template<typename T_type>
+RECYCLONE__NOINLINE auto f_epoch_noiger(auto a_do)
 {
 	t_epoch_noiger<T_type> noiger;
 	return a_do();
 }
 #else
-template<typename T_type, typename T>
-inline auto f_epoch_region(T a_do)
+template<typename T_type>
+inline auto f_epoch_region(auto a_do)
 {
 	return a_do();
 }
-template<typename T_type, typename T>
-inline auto f_epoch_noiger(T a_do)
+template<typename T_type>
+inline auto f_epoch_noiger(auto a_do)
 {
 	return a_do();
 }

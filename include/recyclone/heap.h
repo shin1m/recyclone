@@ -45,10 +45,10 @@ class t_heap
 	template<size_t A_rank, size_t A_size>
 	struct t_of
 	{
-		std::atomic<T*> v_chunks = nullptr;
-		std::atomic_size_t v_grown = 0;
-		std::atomic_size_t v_allocated = 0;
-		std::atomic_size_t v_returned = 0;
+		std::atomic<T*> v_chunks;
+		std::atomic_size_t v_grown;
+		std::atomic_size_t v_allocated;
+		std::atomic_size_t v_returned;
 		size_t v_freed = 0;
 
 		T* f_grow(t_heap& a_heap)
@@ -160,8 +160,7 @@ public:
 	{
 		return v_of0.f_live() + v_of1.f_live() + v_of2.f_live() + v_of3.f_live() + v_of4.f_live() + v_of5.f_live() + v_of6.f_live() + v_allocated - v_freed;
 	}
-	template<typename T_each>
-	void f_statistics(T_each a_each) const
+	void f_statistics(auto a_each) const
 	{
 		a_each(size_t(0), v_of0.v_grown.load(std::memory_order_relaxed), v_of0.v_allocated.load(std::memory_order_relaxed), v_of0.v_returned.load(std::memory_order_relaxed));
 		a_each(size_t(1), v_of1.v_grown.load(std::memory_order_relaxed), v_of1.v_allocated.load(std::memory_order_relaxed), v_of1.v_returned.load(std::memory_order_relaxed));

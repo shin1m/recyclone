@@ -11,23 +11,25 @@ jobs:
         include:
           - tool: gcc
             os: ubuntu-latest
-            cxx: g++-10
+            cxx: g++-12
           - tool: clang
             os: ubuntu-latest
-            cxx: clang++-12
+            cxx: clang++-14
           - tool: emscripten
             os: ubuntu-latest
             container: emscripten/emsdk
+            v8_options: --experimental-wasm-threads
             emcmake: emcmake
           - tool: msvc
             os: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Create Build Environment
         run: cmake -E make_directory build
       - name: Configure CMake
         env:
           CXX: ${{matrix.cxx}}
+          V8_OPTIONS: ${{matrix.v8_options}}
         working-directory: build
         run: ${{matrix.emcmake}} cmake .. -DCMAKE_BUILD_TYPE=${{matrix.configuration}}
       - name: Build

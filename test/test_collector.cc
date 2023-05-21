@@ -3,22 +3,19 @@
 template<typename T>
 struct t_fix : private T
 {
-	template<typename U>
-	explicit constexpr t_fix(U&& x) noexcept : T(std::forward<U>(x))
+	explicit constexpr t_fix(auto&& a_x) noexcept : T(std::forward<decltype(a_x)>(a_x))
 	{
 	}
-	template<typename... As>
-	constexpr decltype(auto) operator()(As&&... as) const
+	constexpr decltype(auto) operator()(auto&&... a_xs) const
 	{
-		return T::operator()(*this, std::forward<As>(as)...);
+		return T::operator()(*this, std::forward<decltype(a_xs)>(a_xs)...);
 	}
 };
 
 template<typename T>
 t_fix(T&&) -> t_fix<std::decay_t<T>>;
 
-template<typename T_move>
-t_pair* f_hanoi(t_pair* RECYCLONE__SPILL a_tower, T_move a_move)
+t_pair* f_hanoi(t_pair* RECYCLONE__SPILL a_tower, auto a_move)
 {
 	return t_fix([&](auto step, t_pair* RECYCLONE__SPILL a_height, t_pair* RECYCLONE__SPILL a_towers, size_t a_from, size_t a_via, size_t a_to) -> t_pair*
 	{

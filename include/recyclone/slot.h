@@ -4,6 +4,23 @@
 #include "define.h"
 #include <atomic>
 
+#ifndef __cpp_lib_atomic_ref
+// TODO Workaround for limited usage as temporary objects.
+namespace std
+{
+template<typename T>
+inline atomic<T>& atomic_ref(T& a_x)
+{
+	return reinterpret_cast<atomic<T>&>(a_x);
+}
+template<typename T>
+inline const atomic<T>& atomic_ref(const T& a_x)
+{
+	return reinterpret_cast<const atomic<T>&>(a_x);
+}
+}
+#endif
+
 namespace recyclone
 {
 
@@ -58,8 +75,7 @@ class t_slot
 		t_object<T_type>* volatile* v_tail{v_objects + V_SIZE - 1};
 
 		void f_next() noexcept;
-		template<typename T>
-		void f__flush(t_object<T_type>* volatile* a_epoch, T a_do)
+		void f__flush(t_object<T_type>* volatile* a_epoch, auto a_do)
 		{
 			auto end = v_objects + V_SIZE - 1;
 			if (a_epoch > v_objects)
@@ -115,7 +131,7 @@ class t_slot
 	};
 
 protected:
-	std::atomic<t_object<T_type>*> v_p;
+	t_object<T_type>* v_p;
 
 public:
 	t_slot() = default;
@@ -129,7 +145,7 @@ public:
 	RECYCLONE__ALWAYS_INLINE t_slot& operator=(t_object<T_type>* a_p)
 	{
 		if (a_p) t_increments::f_push(a_p);
-		if (auto p = v_p.exchange(a_p, std::memory_order_relaxed)) t_decrements::f_push(p);
+		if (auto p = std::atomic_ref(v_p).exchange(a_p, std::memory_order_relaxed)) t_decrements::f_push(p);
 		return *this;
 	}
 	RECYCLONE__ALWAYS_INLINE t_slot& operator=(const t_slot& a_value)
@@ -138,36 +154,36 @@ public:
 	}
 	void f_destruct()
 	{
-		if (auto p = v_p.load(std::memory_order_relaxed)) t_decrements::f_push(p);
+		if (auto p = std::atomic_ref(v_p).load(std::memory_order_relaxed)) t_decrements::f_push(p);
 	}
 	operator bool() const
 	{
-		return v_p.load(std::memory_order_relaxed);
+		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
 	}
 	operator t_object<T_type>*() const
 	{
-		return v_p.load(std::memory_order_relaxed);
+		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
 	}
 	template<typename T>
 	explicit operator T*() const
 	{
-		return static_cast<T*>(v_p.load(std::memory_order_relaxed));
+		return static_cast<T*>(std::atomic_ref(v_p).load(std::memory_order_relaxed));
 	}
 	t_object<T_type>* operator->() const
 	{
-		return v_p.load(std::memory_order_relaxed);
+		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
 	}
 	t_object<T_type>* f_exchange(t_object<T_type>* a_desired)
 	{
 		if (a_desired) t_increments::f_push(a_desired);
-		a_desired = v_p.exchange(a_desired, std::memory_order_relaxed);
+		a_desired = std::atomic_ref(v_p).exchange(a_desired, std::memory_order_relaxed);
 		if (a_desired) t_decrements::f_push(a_desired);
 		return a_desired;
 	}
 	bool f_compare_exchange(t_object<T_type>*& a_expected, t_object<T_type>* a_desired)
 	{
 		if (a_desired) t_increments::f_push(a_desired);
-		if (v_p.compare_exchange_strong(a_expected, a_desired)) {
+		if (std::atomic_ref(v_p).compare_exchange_strong(a_expected, a_desired)) {
 			if (a_expected) t_decrements::f_push(a_expected);
 			return true;
 		} else {
@@ -203,19 +219,18 @@ struct t_slot_of : t_slot<T_type>
 		static_cast<t_slot<T_type>&>(*this) = a_value;
 		return *this;
 	}
-	template<typename U>
-	RECYCLONE__ALWAYS_INLINE t_slot_of& operator=(U&& a_value)
+	RECYCLONE__ALWAYS_INLINE t_slot_of& operator=(auto&& a_value)
 	{
-		static_cast<t_slot<T_type>&>(*this) = std::forward<U>(a_value);
+		static_cast<t_slot<T_type>&>(*this) = std::forward<decltype(a_value)>(a_value);
 		return *this;
 	}
 	operator T*() const
 	{
-		return static_cast<T*>(this->v_p.load(std::memory_order_relaxed));
+		return static_cast<T*>(std::atomic_ref(this->v_p).load(std::memory_order_relaxed));
 	}
 	T* operator->() const
 	{
-		return static_cast<T*>(this->v_p.load(std::memory_order_relaxed));
+		return static_cast<T*>(std::atomic_ref(this->v_p).load(std::memory_order_relaxed));
 	}
 	T* f_exchange(T* a_desired)
 	{
@@ -236,8 +251,7 @@ struct t_root : T
 	t_root(const t_root& a_value) : T(a_value)
 	{
 	}
-	template<typename U>
-	t_root(U&& a_value) : T(std::forward<U>(a_value))
+	t_root(auto&& a_value) : T(std::forward<decltype(a_value)>(a_value))
 	{
 	}
 	~t_root()
@@ -249,10 +263,9 @@ struct t_root : T
 		static_cast<T&>(*this) = a_value;
 		return *this;
 	}
-	template<typename U>
-	t_root& operator=(U&& a_value)
+	t_root& operator=(auto&& a_value)
 	{
-		static_cast<T&>(*this) = std::forward<U>(a_value);
+		static_cast<T&>(*this) = std::forward<decltype(a_value)>(a_value);
 		return *this;
 	}
 };

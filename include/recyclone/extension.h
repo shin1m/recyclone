@@ -27,8 +27,7 @@ class t_weak_pointer : t_weak_pointers<T_type>
 	t_object<T_type>* v_target;
 	t_object<T_type>* v_dependent = nullptr;
 
-	template<typename T>
-	auto f_reviving(T a_do) const
+	auto f_reviving(auto a_do) const
 	{
 		f_engine<T_type>()->v_object__reviving__mutex.lock();
 		auto p = v_target;
@@ -65,7 +64,7 @@ void t_weak_pointer<T_type>::f_attach(t_root<t_slot<T_type>>& a_target)
 	if (!v_target) return;
 	auto extension = v_target->f_extension();
 	std::lock_guard lock(extension->v_weak_pointers__mutex);
-	if (!extension->v_weak_pointers__cycle) extension->v_weak_pointers__cycle.v_p.store(a_target.v_p.exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
+	if (!extension->v_weak_pointers__cycle) std::atomic_ref(extension->v_weak_pointers__cycle.v_p).store(std::atomic_ref(a_target.v_p).exchange(nullptr, std::memory_order_relaxed), std::memory_order_relaxed);
 	this->v_previous = extension->v_weak_pointers.v_previous;
 	this->v_next = static_cast<t_weak_pointer<T_type>*>(&extension->v_weak_pointers);
 	this->v_previous->v_next = this->v_next->v_previous = this;
@@ -75,11 +74,11 @@ template<typename T_type>
 t_object<T_type>* t_weak_pointer<T_type>::f_detach()
 {
 	if (!v_target) return nullptr;
-	auto extension = v_target->v_extension.load(std::memory_order_relaxed);
+	auto extension = v_target->v_extension;
 	std::lock_guard lock(extension->v_weak_pointers__mutex);
 	this->v_previous->v_next = this->v_next;
 	this->v_next->v_previous = this->v_previous;
-	return extension->v_weak_pointers.v_next == &extension->v_weak_pointers ? extension->v_weak_pointers__cycle.v_p.exchange(nullptr, std::memory_order_relaxed) : nullptr;
+	return extension->v_weak_pointers.v_next == &extension->v_weak_pointers ? std::atomic_ref(extension->v_weak_pointers__cycle.v_p).exchange(nullptr, std::memory_order_relaxed) : nullptr;
 }
 
 template<typename T_type>
@@ -128,7 +127,7 @@ void t_weak_pointer<T_type>::f_target__(t_object<T_type>* a_p)
 	t_root<t_slot<T_type>> p = a_p;
 	if (auto q = f_reviving([&]
 	{
-		if (!a_p) v_dependent = dependent.v_p.exchange(v_dependent, std::memory_order_relaxed);
+		if (!a_p) v_dependent = std::atomic_ref(dependent.v_p).exchange(v_dependent, std::memory_order_relaxed);
 		auto r = f_detach();
 		f_attach(p);
 		return r;
@@ -142,7 +141,7 @@ void t_weak_pointer<T_type>::f_dependent__(t_object<T_type>* a_p)
 	t_root<t_slot<T_type>> dependent = a_p;
 	f_reviving([&]
 	{
-		if (v_target) v_dependent = dependent.v_p.exchange(v_dependent, std::memory_order_relaxed);
+		if (v_target) v_dependent = std::atomic_ref(dependent.v_p).exchange(v_dependent, std::memory_order_relaxed);
 		return false;
 	});
 }

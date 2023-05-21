@@ -26,40 +26,37 @@ class t_engine
 
 	struct t_conductor
 	{
-		bool v_running = true;
+		std::atomic_flag v_running;
 		bool v_quitting = false;
-		std::mutex v_mutex;
-		std::condition_variable v_wake;
-		std::condition_variable v_done;
 
-		void f_next(std::unique_lock<std::mutex>& a_lock)
+		t_conductor()
 		{
-			v_running = false;
-			v_done.notify_all();
-			do v_wake.wait(a_lock); while (!v_running);
+			v_running.test_and_set(std::memory_order_relaxed);
+		}
+		void f_next()
+		{
+			v_running.clear(std::memory_order_relaxed);
+			v_running.notify_all();
+			v_running.wait(false, std::memory_order_acquire);
 		}
 		void f_exit()
 		{
-			std::lock_guard lock(v_mutex);
-			v_running = false;
-			v_done.notify_one();
+			v_running.clear(std::memory_order_relaxed);
+			v_running.notify_one();
 		}
 		void f_wake()
 		{
-			if (v_running) return;
-			v_running = true;
-			v_wake.notify_one();
+			if (!v_running.test_and_set(std::memory_order_release)) v_running.notify_one();
 		}
-		void f_wait(std::unique_lock<std::mutex>& a_lock)
+		void f_run()
 		{
-			do v_done.wait(a_lock); while (v_running);
+			f_wake();
+			v_running.wait(true, std::memory_order_relaxed);
 		}
 		void f_quit()
 		{
-			std::unique_lock lock(v_mutex);
-			v_running = v_quitting = true;
-			v_wake.notify_one();
-			f_wait(lock);
+			v_quitting = true;
+			f_run();
 		}
 	};
 
@@ -67,11 +64,11 @@ protected:
 	static inline RECYCLONE__THREAD t_engine* v_instance;
 
 	t_conductor v_collector__conductor;
-	size_t v_collector__tick = 0;
-	size_t v_collector__wait = 0;
+	std::atomic_size_t v_collector__tick;
+	std::atomic_size_t v_collector__wait;
 	size_t v_collector__epoch = 0;
 	size_t v_collector__collect = 0;
-	std::atomic_size_t v_collector__full = 0;
+	std::atomic_size_t v_collector__full;
 	t_object<T_type>* v_cycles = nullptr;
 	t_heap<t_object<T_type>> v_object__heap;
 	size_t v_object__lower = 0;
@@ -95,6 +92,7 @@ protected:
 	std::mutex v_thread__mutex;
 	std::condition_variable v_thread__condition;
 	t_conductor v_finalizer__conductor;
+	std::mutex v_finalizer__mutex;
 	std::deque<t_object<T_type>*> v_finalizer__queue;
 	bool v_finalizer__sleeping = false;
 	uint8_t v_finalizer__awaken = 0;
@@ -169,9 +167,8 @@ public:
 	//! Triggers garbage collection.
 	void f_tick()
 	{
-		if (v_collector__conductor.v_running) return;
-		std::lock_guard lock(v_collector__conductor.v_mutex);
-		++v_collector__tick;
+		if (v_collector__conductor.v_running.test(std::memory_order_relaxed)) return;
+		v_collector__tick.fetch_add(1, std::memory_order_relaxed);
 		v_collector__conductor.f_wake();
 	}
 	//! Triggers garbage collection and waits for it to finish.
@@ -188,10 +185,8 @@ public:
 	void f_wait()
 #endif
 	{
-		std::unique_lock lock(v_collector__conductor.v_mutex);
-		++v_collector__wait;
-		v_collector__conductor.f_wake();
-		v_collector__conductor.f_wait(lock);
+		v_collector__wait.fetch_add(1, std::memory_order_relaxed);
+		v_collector__conductor.f_run();
 	}
 	//! Allocates a new object with the size \p a_size.
 	RECYCLONE__ALWAYS_INLINE constexpr t_object<T_type>* f_allocate(size_t a_size)
@@ -210,11 +205,9 @@ public:
 		return v_exiting;
 	}
 	//! Starts a new thread that calls \p a_main for \p a_thread.
-	template<typename T_thread, typename T_initialize, typename T_main>
-	void f_start(T_thread* a_thread, T_initialize a_initialize, T_main a_main);
+	void f_start(auto* a_thread, auto a_initialize, auto a_main);
 	//! Waits for \p a_thread to finish.
-	template<typename T_thread>
-	void f_join(T_thread* a_thread);
+	void f_join(auto* a_thread);
 };
 
 template<typename T_type>
@@ -224,11 +217,8 @@ void t_engine<T_type>::f_collector()
 	if (v_options.v_verbose) std::fprintf(stderr, "collector starting...\n");
 	t_object<T_type>::v_roots.v_next = t_object<T_type>::v_roots.v_previous = reinterpret_cast<t_object<T_type>*>(&t_object<T_type>::v_roots);
 	while (true) {
-		{
-			std::unique_lock lock(v_collector__conductor.v_mutex);
-			v_collector__conductor.f_next(lock);
-			if (v_collector__conductor.v_quitting) break;
-		}
+		v_collector__conductor.f_next();
+		if (v_collector__conductor.v_quitting) break;
 		++v_collector__epoch;
 		{
 			std::lock_guard lock(v_object__reviving__mutex);
@@ -285,7 +275,7 @@ void t_engine<T_type>::f_collector()
 					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0)
 						failed = true;
 					else if (v_object__reviving)
-					       if (auto p = q->v_extension.load(std::memory_order_relaxed)) if (p->v_weak_pointers__cycle) failed = true;
+					       if (auto p = q->v_extension) if (p->v_weak_pointers__cycle) failed = true;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
 					if (p == cycle) break;
@@ -317,12 +307,12 @@ void t_engine<T_type>::f_collector()
 				} while (p != cycle);
 			} else {
 				if (finalizee) {
-					std::lock_guard lock(v_finalizer__conductor.v_mutex);
+					std::lock_guard lock(v_finalizer__mutex);
 					if (v_finalizer__conductor.v_quitting) {
 						finalizee = false;
 					} else {
 						do {
-							if (auto q = p->v_extension.load(std::memory_order_relaxed)) q->f_detach();
+							if (auto q = p->v_extension) q->f_detach();
 							auto q = p->v_next;
 							if (p->v_finalizee) {
 								p->f_increment();
@@ -416,14 +406,11 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 			std::lock_guard lock(v_thread__mutex);
 			v_finalizer__sleeping = true;
 		});
+		if (v_finalizer__conductor.v_quitting) break;
+		f_epoch_region<T_type>([&, this]
 		{
-			std::unique_lock lock(v_finalizer__conductor.v_mutex);
-			if (v_finalizer__conductor.v_quitting) break;
-			f_epoch_region<T_type>([&, this]
-			{
-				v_finalizer__conductor.f_next(lock);
-			});
-		}
+			v_finalizer__conductor.f_next();
+		});
 		f_epoch_region<T_type>([this]
 		{
 			std::lock_guard lock(v_thread__mutex);
@@ -441,7 +428,7 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 		while (true) {
 			t_object<T_type>* p;
 			{
-				std::lock_guard lock(v_finalizer__conductor.v_mutex);
+				std::lock_guard lock(v_finalizer__mutex);
 				if (v_finalizer__queue.empty()) break;
 				p = v_finalizer__queue.front();
 				v_finalizer__queue.pop_front();
@@ -483,7 +470,7 @@ size_t t_engine<T_type>::f_statistics()
 	});
 	if (v_options.v_verbose) {
 		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
-		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick, v_collector__wait, v_collector__epoch, v_collector__collect);
+		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick.load(std::memory_order_relaxed), v_collector__wait.load(std::memory_order_relaxed), v_collector__epoch, v_collector__collect);
 	}
 	return allocated - freed;
 }
@@ -597,10 +584,7 @@ template<typename T_type>
 void t_engine<T_type>::f_collect()
 {
 	v_collector__full.fetch_add(1, std::memory_order_relaxed);
-	f_wait();
-	f_wait();
-	f_wait();
-	f_wait();
+	for (size_t i = 0; i < 4; ++i) f_wait();
 	v_collector__full.fetch_sub(1, std::memory_order_relaxed);
 }
 
@@ -609,17 +593,12 @@ void t_engine<T_type>::f_finalize()
 {
 	f_epoch_region<T_type>([this]
 	{
-		std::unique_lock lock(v_finalizer__conductor.v_mutex);
-		v_finalizer__conductor.f_wake();
-		v_finalizer__conductor.f_wait(lock);
-		v_finalizer__conductor.f_wake();
-		v_finalizer__conductor.f_wait(lock);
+		for (size_t i = 0; i < 2; ++i) v_finalizer__conductor.f_run();
 	});
 }
 
 template<typename T_type>
-template<typename T_thread, typename T_initialize, typename T_main>
-void t_engine<T_type>::f_start(T_thread* a_thread, T_initialize a_initialize, T_main a_main)
+void t_engine<T_type>::f_start(auto* a_thread, auto a_initialize, auto a_main)
 {
 	// t_thread must be chained first in order to synchronize with f_exit().
 	f_epoch_region<T_type>([&, this]
@@ -668,8 +647,7 @@ void t_engine<T_type>::f_start(T_thread* a_thread, T_initialize a_initialize, T_
 }
 
 template<typename T_type>
-template<typename T_thread>
-void t_engine<T_type>::f_join(T_thread* a_thread)
+void t_engine<T_type>::f_join(auto* a_thread)
 {
 	if (a_thread->v_internal == t_thread<T_type>::v_current) throw std::runtime_error("current thread can not be joined.");
 	if (a_thread->v_internal == v_thread__main) throw std::runtime_error("engine thread can not be joined.");

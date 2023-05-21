@@ -27,6 +27,8 @@ enum t_color : char
 template<typename T_type>
 class t_object
 {
+	static_assert(std::is_trivially_default_constructible_v<t_slot<T_type>>);
+
 	friend T_type;
 	template<typename> friend class t_heap;
 	friend class t_slot<T_type>;
@@ -78,7 +80,7 @@ class t_object
 	size_t v_rank;
 	t_object* v_next_cycle;
 	T_type* v_type;
-	std::atomic<t_extension<T_type>*> v_extension;
+	t_extension<T_type>* v_extension;
 
 	template<void (t_object::*A_push)()>
 	void f_push()
@@ -90,7 +92,7 @@ class t_object
 	{
 		v_type->f_scan(this, f_push<A_push>);
 		v_type->template f_push<A_push>();
-		if (auto p = v_extension.load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
+		if (auto p = std::atomic_ref(v_extension).load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 	}
 	template<void (t_object::*A_step)()>
 	void f_loop()
@@ -121,9 +123,9 @@ class t_object
 	}
 	void f_decrement_step()
 	{
-		if (auto p = v_extension.load(std::memory_order_consume)) {
+		if (auto p = v_extension) {
 			p->f_scan(f_push<&t_object::f_decrement_push>);
-			v_extension.store(nullptr, std::memory_order_relaxed);
+			v_extension = nullptr;
 			delete p;
 		}
 		v_type->f_finalize(this, f_push<&t_object::f_decrement_push>);
@@ -232,9 +234,9 @@ class t_object
 	}
 	void f_cyclic_decrement()
 	{
-		if (auto p = v_extension.load(std::memory_order_consume)) {
+		if (auto p = v_extension) {
 			p->f_scan(f_push<&t_object::f_cyclic_decrement_push>);
-			v_extension.store(nullptr, std::memory_order_relaxed);
+			v_extension = nullptr;
 			delete p;
 		}
 		v_type->f_finalize(this, f_push<&t_object::f_cyclic_decrement_push>);
@@ -292,23 +294,23 @@ public:
 template<typename T_type>
 bool t_object<T_type>::f_queue_finalize()
 {
-	auto& conductor = f_engine<T_type>()->v_finalizer__conductor;
-	std::lock_guard lock(conductor.v_mutex);
-	if (conductor.v_quitting) return false;
+	auto engine = f_engine<T_type>();
+	if (engine->v_finalizer__conductor.v_quitting) return false;
 	f_increment();
-	f_engine<T_type>()->v_finalizer__queue.push_back(this);
-	conductor.f_wake();
+	std::lock_guard lock(engine->v_finalizer__mutex);
+	engine->v_finalizer__queue.push_back(this);
+	engine->v_finalizer__conductor.f_wake();
 	return true;
 }
 
 template<typename T_type>
 t_extension<T_type>* t_object<T_type>::f_extension()
 {
-	auto p = v_extension.load(std::memory_order_consume);
+	auto p = std::atomic_ref(v_extension).load(std::memory_order_consume);
 	if (p) return p;
 	t_extension<T_type>* q = nullptr;
 	p = new t_extension<T_type>;
-	if (v_extension.compare_exchange_strong(q, p, std::memory_order_consume)) return p;
+	if (std::atomic_ref(v_extension).compare_exchange_strong(q, p, std::memory_order_consume)) return p;
 	delete p;
 	return q;
 }

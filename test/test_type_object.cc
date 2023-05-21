@@ -23,12 +23,11 @@ struct t_type : t_object<t_type>
 template<typename T>
 struct t_type_of : t_type
 {
-	template<typename... T_an>
-	T* f_new(T_an&&... a_n)
+	T* f_new(auto&&... a_xs)
 	{
 		f_epoch_point<t_type>();
 		auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
-		new(p) T(std::forward<T_an>(a_n)...);
+		new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
 		// Finishes object construction.
 		p->f_be(this);
 		return p;
@@ -67,7 +66,7 @@ struct t_type_of<t_type> : t_type
 			// Just delegates to a_this.
 			auto p = static_cast<T*>(a_this);
 			p->f_scan(a_scan);
-			p->~T();
+			std::destroy_at(p);
 		};
 		// t_type_of<T> is an instance of t_type_of<t_type>.
 		p->f_be(this);
