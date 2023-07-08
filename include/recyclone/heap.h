@@ -3,6 +3,7 @@
 
 #include "define.h"
 #include <atomic>
+#include <bit>
 #include <map>
 #include <mutex>
 #ifdef __unix__
@@ -19,10 +20,6 @@ namespace recyclone
 template<typename T>
 class t_heap
 {
-	static constexpr size_t f_log(size_t a_x)
-	{
-		return a_x > 1 ? f_log(a_x >> 1) + 1 : 0;
-	}
 	static void* f_map(size_t a_n)
 	{
 #ifdef __unix__
@@ -142,10 +139,10 @@ class t_heap
 	constexpr T* f_allocate_medium(size_t a_size);
 
 public:
-	static constexpr size_t V_UNIT = 2 << f_log(sizeof(T) - 1);
-	static_assert(V_UNIT >> 1 < sizeof(T));
-	static_assert(V_UNIT >= sizeof(T));
-	static constexpr size_t V_RANKX = sizeof(void*) * 8 - f_log(V_UNIT);
+	static constexpr size_t V_UNIT = std::bit_floor(sizeof(T)) << 1;
+	static_assert(V_UNIT >> 1 <= sizeof(T));
+	static_assert(V_UNIT > sizeof(T));
+	static constexpr size_t V_RANKX = std::countl_zero(V_UNIT - 1);
 	static_assert((V_UNIT << (V_RANKX - 1)) - 1 == ~size_t(0) >> 1);
 	static_assert((V_UNIT << V_RANKX) - 1 == ~size_t(0));
 
