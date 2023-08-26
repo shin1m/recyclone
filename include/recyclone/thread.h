@@ -102,6 +102,8 @@ class t_thread
 #endif
 #ifdef _WIN32
 	HANDLE v_handle = NULL;
+	CONTEXT v_context_last{};
+	CONTEXT v_context;
 #endif
 	//! Copied stack of the last epoch.
 	std::unique_ptr<t_object<T_type>*[]> v_stack_last;
@@ -204,10 +206,9 @@ class t_thread
 #endif
 #ifdef _WIN32
 		SuspendThread(v_handle);
-		CONTEXT context;
-		context.ContextFlags = CONTEXT_CONTROL;
-		GetThreadContext(v_handle, &context);
-		v_stack_top = reinterpret_cast<t_object<T_type>**>(context.Rsp);
+		v_context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+		GetThreadContext(v_handle, &v_context);
+		v_stack_top = reinterpret_cast<t_object<T_type>**>(v_context.Rsp);
 		MEMORY_BASIC_INFORMATION mbi;
 		for (auto p = v_stack_top;;) {
 			VirtualQuery(p, &mbi, sizeof(mbi));
@@ -311,11 +312,14 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 template<typename T_type>
 void t_thread<T_type>::f_epoch()
 {
-	auto bottom0 = f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size;
-	auto top0 = bottom0;
-	auto top1 = v_stack_last.get() + v_stack_last_size;
+	auto top0 = f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size;
+	auto bottom1 = v_stack_last.get() + v_stack_last_size;
+	auto top1 = bottom1;
 	if (v_done > 0) {
 		++v_done;
+#ifdef _WIN32
+		v_context = {};
+#endif
 	} else {
 		f_epoch_suspend();
 		auto n = v_stack_bottom - v_stack_top;
@@ -325,6 +329,9 @@ void t_thread<T_type>::f_epoch()
 		top1 -= n;
 	}
 	auto decrements = f_engine<T_type>()->v_stack__copy.get();
+#ifdef _WIN32
+	auto cdecrements = reinterpret_cast<t_object<T_type>**>(&v_context);
+#endif
 	{
 		auto top2 = v_stack_last_top;
 		v_stack_last_top = top1;
@@ -337,7 +344,11 @@ void t_thread<T_type>::f_epoch()
 			} while (top1 < top2);
 		else
 			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
-		for (; top0 < bottom0; ++top1) {
+#ifdef _WIN32
+		auto increment = [&](auto top0, auto top1, auto bottom1, auto& decrements)
+		{
+#endif
+		for (; top1 < bottom1; ++top1) {
 			auto p = *top0++;
 			auto q = *top1;
 			if (p == q) continue;
@@ -347,9 +358,17 @@ void t_thread<T_type>::f_epoch()
 			if (q) *decrements++ = q;
 			*top1 = p;
 		}
+#ifdef _WIN32
+		};
+		increment(top0, top1, bottom1, decrements);
+		increment(reinterpret_cast<t_object<T_type>**>(&v_context), reinterpret_cast<t_object<T_type>**>(&v_context_last), reinterpret_cast<t_object<T_type>**>(&v_context_last + 1), cdecrements);
+#endif
 	}
 	v_increments.f_flush();
 	for (auto p = f_engine<T_type>()->v_stack__copy.get(); p != decrements; ++p) (*p)->f_decrement();
+#ifdef _WIN32
+	for (auto p = reinterpret_cast<t_object<T_type>**>(&v_context); p != cdecrements; ++p) (*p)->f_decrement();
+#endif
 	v_decrements.f_flush();
 }
 
