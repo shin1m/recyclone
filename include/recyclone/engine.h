@@ -124,7 +124,9 @@ protected:
 	void f_epoch_suspend()
 	{
 		if (sem_post(&v_epoch__received) == -1) _exit(errno);
+		auto e = errno;
 		sigsuspend(&v_epoch__not_signal_resume);
+		errno = e;
 	}
 	void f_epoch_wait()
 	{
