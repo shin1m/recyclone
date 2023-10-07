@@ -1,11 +1,4 @@
-#include <recyclone/engine.h>
-#ifdef NDEBUG
-#undef NDEBUG
-#include <cassert>
-#define NDEBUG
-#endif
-
-using namespace recyclone;
+#include "define.h"
 
 //! An example type descriptor that is also an object.
 struct t_type : t_object<t_type>
