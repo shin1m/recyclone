@@ -151,7 +151,7 @@ class t_thread
 #endif
 #ifdef _WIN32
 		CONTEXT context;
-		context.ContextFlags = CONTEXT_FULL;
+		context.ContextFlags = CONTEXT_INTEGER;
 		GetThreadContext(v_handle, &context);
 #endif
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(&context);

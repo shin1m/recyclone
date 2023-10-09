@@ -398,6 +398,52 @@ void t_engine<T_type>::f_collector()
 	v_collector__conductor.f_exit();
 }
 
+void f_with_scratch(auto a_do)
+{
+	char padding[4096];
+	std::memset(padding, 0, sizeof(padding));
+	a_do();
+	// TODO: Try to clear volatile registers.
+	[](intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t) -> intptr_t
+	{
+		return 0;
+	}(0, 0, 0, 0, 0, 0, 0, 0);
+#ifdef __unix__
+#ifdef __amd64__
+	__asm__(
+		"mov $0, %r10\n\t"
+		"mov $0, %r11\n\t"
+	);
+#endif
+#ifdef __aarch64__
+	__asm__(
+		"mov $0, %x9\n\t"
+		"mov $0, %x10\n\t"
+		"mov $0, %x11\n\t"
+		"mov $0, %x12\n\t"
+		"mov $0, %x13\n\t"
+		"mov $0, %x14\n\t"
+		"mov $0, %x15\n\t"
+		"mov $0, %x16\n\t"
+		"mov $0, %x17\n\t"
+	);
+#endif
+#endif
+#ifdef _WIN32
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_INTEGER;
+	auto thread = GetCurrentThread();
+	GetThreadContext(thread, &context);
+#ifdef _M_AMD64
+	context.R10 = context.R11 = 0;
+#endif
+#ifdef _M_ARM64
+	context.X9 = context.X10 = context.X11 = context.X12 = context.X13 = context.X14 = context.X15 = context.X16 = context.X17 = 0;
+#endif
+	SetThreadContext(thread, &context);
+#endif
+}
+
 template<typename T_type>
 void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 {
@@ -420,11 +466,7 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 			v_finalizer__awaken = 2;
 		});
 #ifndef NDEBUG
-		[this, a_finalize]
-		{
-		char padding[4096];
-		std::memset(padding, 0, sizeof(padding));
-		[this, a_finalize]
+		f_with_scratch([&]
 		{
 #endif
 		while (true) {
@@ -440,8 +482,7 @@ void t_engine<T_type>::f_finalizer(void(*a_finalize)(t_object<T_type>*))
 			t_slot<T_type>::t_decrements::f_push(p);
 		}
 #ifndef NDEBUG
-		}();
-		}();
+		});
 #endif
 	}
 	if (v_options.v_verbose) std::fprintf(stderr, "finalizer quitting...\n");

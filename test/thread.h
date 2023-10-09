@@ -45,13 +45,4 @@ struct t_engine_with_finalizer : t_engine_with_threads
 	}
 };
 
-void f_padding(auto a_do)
-{
-	char padding[4096];
-	std::memset(padding, 0, sizeof(padding));
-	a_do();
-	// TODO: Workaround for Clang Debug build.
-	std::snprintf(nullptr, 0, "");
-}
-
 #endif

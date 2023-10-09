@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 		return std::make_pair(x, y);
 	};
 	std::unique_ptr<t_weak_pointer<t_type>> w;
-	f_padding([&]
+	f_with_scratch([&]
 	{
 		f_epoch_point<t_type>();
 		auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 #ifndef NDEBUG
 	assert(w->f_get() == pair(nullptr, nullptr));
 #endif
-	f_padding([&]
+	f_with_scratch([&]
 	{
 		f_epoch_point<t_type>();
 		auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 #ifndef NDEBUG
 	assert(w->f_get() == pair(nullptr, nullptr));
 #endif
-	f_padding([&]
+	f_with_scratch([&]
 	{
 		f_epoch_point<t_type>();
 		auto RECYCLONE__SPILL x = f_new<t_symbol>("bar"sv);
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 	});
 	engine.f_collect();
 	engine.f_finalize();
-	f_padding([&]
+	f_with_scratch([&]
 	{
 		f_epoch_point<t_type>();
 		assert(w->f_get().first != nullptr);
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
 #ifndef NDEBUG
 	assert(w->f_get() == pair(nullptr, nullptr));
 #endif
-	f_padding([&]
+	f_with_scratch([&]
 	{
 		f_epoch_point<t_type>();
 		auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);

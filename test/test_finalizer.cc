@@ -39,14 +39,14 @@ int main(int argc, char* argv[])
 			});
 		}
 	});
-	f_padding([]
+	f_with_scratch([]
 	{
 		f_epoch_point<t_type>();
 		f_new<t_pair>(f_new<t_symbol>("foo"sv))->f_finalizee__(true);
 	});
 	engine.f_collect();
 	engine.f_finalize();
-	f_padding([]
+	f_with_scratch([]
 	{
 		f_epoch_point<t_type>();
 		auto s = f_string(v_resurrected);
