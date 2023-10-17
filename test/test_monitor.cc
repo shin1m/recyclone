@@ -23,11 +23,7 @@ int main(int argc, char* argv[])
 			{
 				mutex.lock();
 			});
-#ifdef _MSC_VER
-			std::unique_lock<std::recursive_timed_mutex> lock(mutex, std::adopt_lock);
-#else
 			std::unique_lock lock(mutex, std::adopt_lock);
-#endif
 			worker = engine.f_start_thread([&]
 			{
 				f_epoch_point<t_type>();
@@ -42,11 +38,7 @@ int main(int argc, char* argv[])
 							{
 								mutex.lock();
 							});
-#ifdef _MSC_VER
-							std::unique_lock<std::recursive_timed_mutex> lock(mutex, std::adopt_lock);
-#else
 							std::unique_lock lock(mutex, std::adopt_lock);
-#endif
 							action = nullptr;
 							condition.notify_one();
 							while (!action) {
@@ -60,7 +52,11 @@ int main(int argc, char* argv[])
 						action();
 						f_epoch_point<t_type>();
 					}
+#ifdef _MSC_VER
+				} catch (int) {}
+#else
 				} catch (std::nullptr_t) {}
+#endif
 				f_epoch_region<t_type>([]
 				{
 					std::printf("exit\n");
@@ -81,11 +77,7 @@ int main(int argc, char* argv[])
 			{
 				mutex.lock();
 			});
-#ifdef _MSC_VER
-			std::unique_lock<std::recursive_timed_mutex> lock(mutex, std::adopt_lock);
-#else
 			std::unique_lock lock(mutex, std::adopt_lock);
-#endif
 			action = x;
 			condition.notify_one();
 			while (action) {
@@ -116,7 +108,11 @@ int main(int argc, char* argv[])
 			action = []
 			{
 				f_epoch_point<t_type>();
+#ifdef _MSC_VER
+				throw 0;
+#else
 				throw nullptr;
+#endif
 			};
 			condition.notify_one();
 		}
