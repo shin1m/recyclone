@@ -4,9 +4,9 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
-	options.v_verbose = options.v_verify = true;
+	options.v_verbose = true;
 	t_engine<t_type> engine(options);
-	return engine.f_exit([]
+	return engine.f_run([]
 	{
 		auto RECYCLONE__SPILL p = f_new<t_pair>(f_new<t_symbol>("outside"sv));
 		auto s = f_string(p);
@@ -21,5 +21,5 @@ int main(int argc, char* argv[])
 			std::printf("%s\n", s.c_str());
 		});
 		return 0;
-	}());
+	});
 }

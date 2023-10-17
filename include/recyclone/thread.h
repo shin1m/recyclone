@@ -250,7 +250,7 @@ public:
 	}
 
 	/*!
-	  \sa t_engine::f_exit skips waiting for this thread to finish if true.
+	  \sa t_engine::f_run skips waiting for this thread to finish if true.
 	  Must be accessed with t_engine::v_thread__mutex locked.
 	 */
 	bool v_background = false;

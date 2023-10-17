@@ -6,9 +6,9 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
-	options.v_verbose = options.v_verify = true;
+	options.v_verbose = true;
 	t_engine_with_threads engine(options);
-	return engine.f_exit([&]
+	return engine.f_run([&]
 	{
 		auto RECYCLONE__SPILL monitor = f_new<t_symbol>("monitor"sv);
 		auto& mutex = monitor->f_extension()->v_mutex;
@@ -127,5 +127,5 @@ int main(int argc, char* argv[])
 		});
 		assert(log == "Hello, World.");
 		return 0;
-	}());
+	});
 }

@@ -6,13 +6,16 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = true;
 	t_engine_with_threads engine(options);
-	engine.f_start_thread([]
+	std::exit(engine.f_run([&]
 	{
-		f_epoch_point<t_type>();
-		f_epoch_region<t_type>([]
+		engine.f_start_thread([]
 		{
-			std::this_thread::sleep_for(std::chrono::seconds::max());
-		});
-	}, true);
-	return engine.f_exit(0);
+			f_epoch_point<t_type>();
+			f_epoch_region<t_type>([]
+			{
+				std::this_thread::sleep_for(std::chrono::seconds::max());
+			});
+		}, true);
+		return 0;
+	}));
 }

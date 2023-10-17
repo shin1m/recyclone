@@ -137,7 +137,6 @@ protected:
 	void f_collector();
 	void f_finalizer(void(*a_finalize)(t_object<T_type>*));
 	void f_finalize(t_thread<T_type>* a_thread);
-	size_t f_statistics();
 
 public:
 	struct t_options
@@ -148,24 +147,18 @@ public:
 		size_t v_collector__threshold = 64;
 #endif
 		bool v_verbose = false;
-		bool v_verify = false;
 	};
 
 	const t_options& v_options;
 
 	t_engine(const t_options& a_options, void* a_bottom = nullptr);
+	//! Tries to collect all the objects and detects leaks.
 	~t_engine();
 	/*!
-	  Performs the exit sequence:
-	  - Waits for foreground threads to finish.
-	  - If \sa t_options::v_verify is true,
-	    - Tries to collect all the objects and detects leaks.
-	    - Returns \p a_code.
-	  - Otherwise, immediately calls \sa std::exit with \p a_code.
-	  \param a_code The exit code.
-	  \return \p a_code.
+	  Runs \p a_do and waits for foreground threads to finish.
+	  \return the value returned by \p a_do().
 	 */
-	int f_exit(int a_code);
+	RECYCLONE__NOINLINE auto f_run(auto a_do);
 	//! Triggers garbage collection.
 	void f_tick()
 	{
@@ -201,7 +194,7 @@ public:
 	void f_collect();
 	//! Performs finalization.
 	void f_finalize();
-	//! Gets whether the exit sequence finished waiting foreground threads.
+	//! Gets whether \sa f_run finished waiting foreground threads.
 	bool f_exiting() const
 	{
 		return v_exiting;
@@ -500,25 +493,6 @@ void t_engine<T_type>::f_finalize(t_thread<T_type>* a_thread)
 }
 
 template<typename T_type>
-size_t t_engine<T_type>::f_statistics()
-{
-	if (v_options.v_verbose) std::fprintf(stderr, "statistics:\n\tt_object:\n");
-	size_t allocated = 0;
-	size_t freed = 0;
-	v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
-	{
-		if (v_options.v_verbose) std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
-		allocated += a_allocated;
-		freed += a_freed;
-	});
-	if (v_options.v_verbose) {
-		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
-		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick.load(std::memory_order_relaxed), v_collector__wait.load(std::memory_order_relaxed), v_collector__epoch, v_collector__collect);
-	}
-	return allocated - freed;
-}
-
-template<typename T_type>
 t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_object__heap([]
 {
 	v_instance->f_tick();
@@ -554,6 +528,18 @@ t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_objec
 template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
+	v_collector__full.fetch_add(1, std::memory_order_relaxed);
+	if (v_thread__finalizer) {
+		for (size_t i = 0; i < 4; ++i) f_wait();
+		f_finalize();
+		assert(v_thread__head == v_thread__finalizer);
+		f_epoch_region<T_type>([this]
+		{
+			v_finalizer__conductor.f_quit();
+			std::unique_lock lock(v_thread__mutex);
+			while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
+		});
+	}
 	f_finalize(v_thread__main);
 #ifdef RECYCLONE__COOPERATIVE
 	for (size_t i = 0; i < 4; ++i) f__wait();
@@ -569,7 +555,20 @@ t_engine<T_type>::~t_engine()
 	if (sigaction(RECYCLONE__SIGNAL_RESUME, &v_epoch__old_signal_resume, NULL) == -1) std::exit(errno);
 #endif
 #endif
-	if (f_statistics() <= 0) return;
+	if (v_options.v_verbose) std::fprintf(stderr, "statistics:\n\tt_object:\n");
+	size_t allocated = 0;
+	size_t freed = 0;
+	v_object__heap.f_statistics([&](auto a_rank, auto a_grown, auto a_allocated, auto a_freed)
+	{
+		if (v_options.v_verbose) std::fprintf(stderr, "\t\trank%zu: %zu: %zu - %zu = %zu\n", a_rank, a_grown, a_allocated, a_freed, a_allocated - a_freed);
+		allocated += a_allocated;
+		freed += a_freed;
+	});
+	if (v_options.v_verbose) {
+		std::fprintf(stderr, "\t\ttotal: %zu - %zu = %zu, release = %zu, collect = %zu\n", allocated, freed, allocated - freed, v_object__release, v_object__collect);
+		std::fprintf(stderr, "\tcollector: tick = %zu, wait = %zu, epoch = %zu, collect = %zu\n", v_collector__tick.load(std::memory_order_relaxed), v_collector__wait.load(std::memory_order_relaxed), v_collector__epoch, v_collector__collect);
+	}
+	if (allocated <= freed) return;
 	if (v_options.v_verbose) {
 		std::map<T_type*, size_t> leaks;
 		for (auto& x : v_object__heap.f_blocks())
@@ -590,8 +589,9 @@ t_engine<T_type>::~t_engine()
 }
 
 template<typename T_type>
-int t_engine<T_type>::f_exit(int a_code)
+auto t_engine<T_type>::f_run(auto a_do)
 {
+	auto n = a_do();
 	f_epoch_region<T_type>([this]
 	{
 		std::unique_lock lock(v_thread__mutex);
@@ -604,23 +604,7 @@ int t_engine<T_type>::f_exit(int a_code)
 		}
 		v_exiting = true;
 	});
-	if (v_options.v_verify) {
-		v_collector__full.fetch_add(1, std::memory_order_relaxed);
-		if (!v_thread__finalizer) return a_code;
-		for (size_t i = 0; i < 4; ++i) f_wait();
-		f_finalize();
-		assert(v_thread__head == v_thread__finalizer);
-		f_epoch_region<T_type>([this]
-		{
-			v_finalizer__conductor.f_quit();
-			std::unique_lock lock(v_thread__mutex);
-			while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
-		});
-		return a_code;
-	} else {
-		if (v_options.v_verbose) f_statistics();
-		std::exit(a_code);
-	}
+	return n;
 }
 
 template<typename T_type>
@@ -663,10 +647,7 @@ void t_engine<T_type>::f_start(auto* a_thread, auto a_initialize, auto a_main)
 				initialize();
 				if (internal->v_background) v_thread__condition.notify_all();
 			}
-			try {
-				main();
-			} catch (...) {
-			}
+			main();
 			f_epoch_region<T_type>([&, this]
 			{
 				std::lock_guard lock(v_thread__mutex);

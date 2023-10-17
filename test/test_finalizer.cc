@@ -8,11 +8,7 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
-#ifdef NDEBUG
 	options.v_verbose = true;
-#else
-	options.v_verbose = options.v_verify = true;
-#endif
 	t_engine_with_finalizer engine(options, [](auto RECYCLONE__SPILL a_p)
 	{
 		f_epoch_point<t_type>();
@@ -39,34 +35,45 @@ int main(int argc, char* argv[])
 			});
 		}
 	});
-	f_with_scratch([]
+#ifdef NDEBUG
+	std::exit(engine.f_run([&]
+#else
+	return engine.f_run([&]
+#endif
 	{
-		f_epoch_point<t_type>();
-		f_new<t_pair>(f_new<t_symbol>("foo"sv))->f_finalizee__(true);
-	});
-	engine.f_collect();
-	engine.f_finalize();
-	f_with_scratch([]
-	{
-		f_epoch_point<t_type>();
-		auto s = f_string(v_resurrected);
-		f_epoch_region<t_type>([&]
+		f_with_scratch([]
 		{
-			std::printf("resurrected: %s\n", s.c_str());
+			f_epoch_point<t_type>();
+			f_new<t_pair>(f_new<t_symbol>("foo"sv))->f_finalizee__(true);
+		});
+		engine.f_collect();
+		engine.f_finalize();
+		f_with_scratch([]
+		{
+			f_epoch_point<t_type>();
+			auto s = f_string(v_resurrected);
+			f_epoch_region<t_type>([&]
+			{
+				std::printf("resurrected: %s\n", s.c_str());
+			});
+#ifndef NDEBUG
+			assert(v_resurrected);
+#endif
+			v_resurrected = nullptr;
+		});
+		engine.f_collect();
+		engine.f_finalize();
+		f_epoch_region<t_type>([]
+		{
+			std::printf("finalized: %zu\n", v_finalized);
 		});
 #ifndef NDEBUG
-		assert(v_resurrected);
+		assert(v_finalized == 1);
 #endif
-		v_resurrected = nullptr;
+		return 0;
+#ifdef NDEBUG
+	}));
+#else
 	});
-	engine.f_collect();
-	engine.f_finalize();
-	f_epoch_region<t_type>([]
-	{
-		std::printf("finalized: %zu\n", v_finalized);
-	});
-#ifndef NDEBUG
-	assert(v_finalized == 1);
 #endif
-	return engine.f_exit(0);
 }

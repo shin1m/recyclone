@@ -5,11 +5,10 @@ int main(int argc, char* argv[])
 {
 	t_engine<t_type>::t_options options;
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
-	options.v_verbose = options.v_verify = true;
+	options.v_verbose = true;
 	t_engine_with_threads engine(options);
-	return engine.f_exit([&]() RECYCLONE__NOINLINE
+	return engine.f_run([&]
 	{
-		f_epoch_point<t_type>();
 		auto RECYCLONE__SPILL p = f_new<t_pair>();
 		::t_thread* RECYCLONE__SPILL ts[10];
 		for (size_t i = 0; i < 10; ++i) {
@@ -37,5 +36,5 @@ int main(int argc, char* argv[])
 			std::printf("%s\n", s.c_str());
 		});
 		return 0;
-	}());
+	});
 }
