@@ -102,8 +102,10 @@ class t_thread
 #endif
 #ifdef _WIN32
 	HANDLE v_handle = NULL;
+#ifndef RECYCLONE__COOPERATIVE
 	CONTEXT v_context_last{};
-	CONTEXT v_context;
+	CONTEXT v_context{};
+#endif
 #endif
 	//! Copied stack of the last epoch.
 	std::unique_ptr<t_object<T_type>*[]> v_stack_last;
@@ -150,7 +152,7 @@ class t_thread
 #endif
 #endif
 #ifdef _WIN32
-		CONTEXT context;
+		CONTEXT context{};
 		context.ContextFlags = CONTEXT_INTEGER;
 		GetThreadContext(v_handle, &context);
 #endif
@@ -206,7 +208,6 @@ class t_thread
 #endif
 #ifdef _WIN32
 		SuspendThread(v_handle);
-		v_context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
 		GetThreadContext(v_handle, &v_context);
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(v_context.Rsp);
 		MEMORY_BASIC_INFORMATION mbi;
@@ -291,6 +292,9 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 #endif
 #ifdef _WIN32
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+#ifndef RECYCLONE__COOPERATIVE
+	v_context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+#endif
 #endif
 	auto limit = f_limit();
 	v_stack_last_size = limit / sizeof(t_object<T_type>*);
@@ -318,7 +322,9 @@ void t_thread<T_type>::f_epoch()
 	if (v_done > 0) {
 		++v_done;
 #ifdef _WIN32
+#ifndef RECYCLONE__COOPERATIVE
 		v_context = {};
+#endif
 #endif
 	} else {
 		f_epoch_suspend();
@@ -330,7 +336,13 @@ void t_thread<T_type>::f_epoch()
 	}
 	auto decrements = f_engine<T_type>()->v_stack__copy.get();
 #ifdef _WIN32
+#ifndef RECYCLONE__COOPERATIVE
+#ifndef NDEBUG
+	std::fprintf(stderr, "RAX: %p\nRCX: %p\nRDX: %p\nRBX: %p\nRSP: %p\nRBP: %p\nRSI: %p\nRDI: %p\nR8: %p\nR9: %p\nR10: %p\nR11: %p\nR12: %p\nR13: %p\nR14: %p\nR15: %p\n", v_context.Rax, v_context.Rcx, v_context.Rdx, v_context.Rbx, v_context.Rsp, v_context.Rbp, v_context.Rsi, v_context.Rdi, v_context.R8, v_context.R9, v_context.R10, v_context.R11, v_context.R12, v_context.R13, v_context.R14, v_context.R15);
+	for (size_t i = 0; i < sizeof(v_context) / sizeof(void*); ++i) std::fprintf(stderr, "%zu: %p\n", i, reinterpret_cast<void**>(&v_context)[i]);
+#endif
 	auto cdecrements = reinterpret_cast<t_object<T_type>**>(&v_context);
+#endif
 #endif
 	{
 		auto top2 = v_stack_last_top;
@@ -345,8 +357,10 @@ void t_thread<T_type>::f_epoch()
 		else
 			for (; top2 < top1; ++top2) if (*top2) *decrements++ = *top2;
 #ifdef _WIN32
+#ifndef RECYCLONE__COOPERATIVE
 		auto increment = [&](auto top0, auto top1, auto bottom1, auto& decrements)
 		{
+#endif
 #endif
 		for (; top1 < bottom1; ++top1) {
 			auto p = *top0++;
@@ -359,15 +373,19 @@ void t_thread<T_type>::f_epoch()
 			*top1 = p;
 		}
 #ifdef _WIN32
+#ifndef RECYCLONE__COOPERATIVE
 		};
 		increment(top0, top1, bottom1, decrements);
 		increment(reinterpret_cast<t_object<T_type>**>(&v_context), reinterpret_cast<t_object<T_type>**>(&v_context_last), reinterpret_cast<t_object<T_type>**>(&v_context_last + 1), cdecrements);
+#endif
 #endif
 	}
 	v_increments.f_flush();
 	for (auto p = f_engine<T_type>()->v_stack__copy.get(); p != decrements; ++p) (*p)->f_decrement();
 #ifdef _WIN32
+#ifndef RECYCLONE__COOPERATIVE
 	for (auto p = reinterpret_cast<t_object<T_type>**>(&v_context); p != cdecrements; ++p) (*p)->f_decrement();
+#endif
 #endif
 	v_decrements.f_flush();
 }

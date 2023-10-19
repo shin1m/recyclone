@@ -33,6 +33,7 @@ int main(int argc, char* argv[])
 		{
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
+			std::fprintf(stderr, "x: %p\n", x);
 			w = std::make_unique<t_weak_pointer<t_type>>(x, false);
 			assert(w->f_get() == pair(x, nullptr));
 		});
@@ -44,10 +45,13 @@ int main(int argc, char* argv[])
 		{
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
+			std::fprintf(stderr, "x: %p\n", x);
 			auto RECYCLONE__SPILL y = f_new<t_symbol>("bar"sv);
+			std::fprintf(stderr, "y: %p\n", y);
 			w = std::make_unique<t_weak_pointer<t_type>>(x, y);
 			assert(w->f_get() == pair(x, y));
 			auto RECYCLONE__SPILL z = f_new<t_symbol>("zot"sv);
+			std::fprintf(stderr, "z: %p\n", z);
 			w->f_dependent__(z);
 			assert(w->f_get() == pair(x, z));
 		});
@@ -59,6 +63,7 @@ int main(int argc, char* argv[])
 		{
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("bar"sv);
+			std::fprintf(stderr, "x: %p\n", x);
 			x->f_finalizee__(true);
 			w = std::make_unique<t_weak_pointer<t_type>>(x, true);
 			assert(w->f_get() == pair(x, nullptr));
@@ -81,8 +86,10 @@ int main(int argc, char* argv[])
 		{
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
+			std::fprintf(stderr, "x: %p\n", x);
 			w = std::make_unique<t_weak_pointer<t_type>>(x, true);
 			auto RECYCLONE__SPILL y = f_new<t_symbol>("bar"sv);
+			std::fprintf(stderr, "y: %p\n", y);
 			w->f_target__(y);
 			assert(w->f_get() == pair(y, nullptr));
 		});
