@@ -18,11 +18,7 @@ int main(int argc, char* argv[])
 		v_resurrected = p;
 		p->f_finalizee__(true);
 	});
-#ifdef NDEBUG
-	std::exit(engine.f_run([&]
-#else
-	return engine.f_run([&]
-#endif
+	return [&]() RECYCLONE__NOINLINE
 	{
 		auto pair = [](t_object<t_type>* x, t_object<t_type>* y)
 		{
@@ -93,10 +89,12 @@ int main(int argc, char* argv[])
 			w->f_target__(y);
 			assert(w->f_get() == pair(y, nullptr));
 		});
-		return 0;
+		engine.f_join_foregrounds();
 #ifdef NDEBUG
-	}));
+		std::exit(0);
 #else
-	});
+		engine.f_quit_finalizer();
 #endif
+		return 0;
+	}();
 }

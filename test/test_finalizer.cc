@@ -35,11 +35,7 @@ int main(int argc, char* argv[])
 			});
 		}
 	});
-#ifdef NDEBUG
-	std::exit(engine.f_run([&]
-#else
-	return engine.f_run([&]
-#endif
+	return [&]() RECYCLONE__NOINLINE
 	{
 		f_with_scratch([]
 		{
@@ -70,10 +66,12 @@ int main(int argc, char* argv[])
 #ifndef NDEBUG
 		assert(v_finalized == 1);
 #endif
-		return 0;
+		engine.f_join_foregrounds();
 #ifdef NDEBUG
-	}));
+		std::exit(0);
 #else
-	});
+		engine.f_quit_finalizer();
 #endif
+		return 0;
+	}();
 }

@@ -7,7 +7,7 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = true;
 	t_engine_with_threads engine(options);
-	return engine.f_run([&]
+	return [&]() RECYCLONE__NOINLINE
 	{
 		auto RECYCLONE__SPILL p = f_new<t_pair>();
 		::t_thread* RECYCLONE__SPILL ts[10];
@@ -35,6 +35,7 @@ int main(int argc, char* argv[])
 		{
 			std::printf("%s\n", s.c_str());
 		});
+		engine.f_join_foregrounds();
 		return 0;
-	});
+	}();
 }

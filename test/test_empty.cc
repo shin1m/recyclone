@@ -6,8 +6,7 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = true;
 	t_engine<t_type> engine(options);
-	return engine.f_run([]
-	{
-		return 0;
-	});
+	engine.f_join_foregrounds();
+	assert(engine.f_exiting());
+	return 0;
 }

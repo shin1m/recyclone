@@ -154,11 +154,6 @@ public:
 	t_engine(const t_options& a_options, void* a_bottom = nullptr);
 	//! Tries to collect all the objects and detects leaks.
 	~t_engine();
-	/*!
-	  Runs \p a_do and waits for foreground threads to finish.
-	  \return the value returned by \p a_do().
-	 */
-	RECYCLONE__NOINLINE auto f_run(auto a_do);
 	//! Triggers garbage collection.
 	void f_tick()
 	{
@@ -194,7 +189,7 @@ public:
 	void f_collect();
 	//! Performs finalization.
 	void f_finalize();
-	//! Gets whether \sa f_run finished waiting foreground threads.
+	//! Gets whether \sa f_join_foregrounds finished waiting foreground threads.
 	bool f_exiting() const
 	{
 		return v_exiting;
@@ -203,6 +198,10 @@ public:
 	void f_start(auto* a_thread, auto a_initialize, auto a_main);
 	//! Waits for \p a_thread to finish.
 	void f_join(auto* a_thread);
+	//! Waits for foreground threads to finish and mark exiting.
+	void f_join_foregrounds();
+	//! Quits finalizer.
+	void f_quit_finalizer();
 };
 
 template<typename T_type>
@@ -528,19 +527,8 @@ t_engine<T_type>::t_engine(const t_options& a_options, void* a_bottom) : v_objec
 template<typename T_type>
 t_engine<T_type>::~t_engine()
 {
-	v_collector__full.fetch_add(1, std::memory_order_relaxed);
-	if (v_thread__finalizer) {
-		for (size_t i = 0; i < 4; ++i) f_wait();
-		f_finalize();
-		assert(v_thread__head == v_thread__finalizer);
-		f_epoch_region<T_type>([this]
-		{
-			v_finalizer__conductor.f_quit();
-			std::unique_lock lock(v_thread__mutex);
-			while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
-		});
-	}
 	f_finalize(v_thread__main);
+	v_collector__full.fetch_add(1, std::memory_order_relaxed);
 #ifdef RECYCLONE__COOPERATIVE
 	for (size_t i = 0; i < 4; ++i) f__wait();
 #else
@@ -586,25 +574,6 @@ t_engine<T_type>::~t_engine()
 		for (const auto& x : leaks) std::fprintf(stderr, "%p: %zu\n", x.first, x.second);
 	}
 	std::terminate();
-}
-
-template<typename T_type>
-auto t_engine<T_type>::f_run(auto a_do)
-{
-	auto n = a_do();
-	f_epoch_region<T_type>([this]
-	{
-		std::unique_lock lock(v_thread__mutex);
-		auto tail = v_thread__finalizer ? v_thread__finalizer : v_thread__main;
-		while (true) {
-			auto p = v_thread__head;
-			while (p != tail && (p->v_done > 0 || p->v_background)) p = p->v_next;
-			if (p == tail) break;
-			v_thread__condition.wait(lock);
-		}
-		v_exiting = true;
-	});
-	return n;
 }
 
 template<typename T_type>
@@ -679,6 +648,37 @@ void t_engine<T_type>::f_join(auto* a_thread)
 	{
 		std::unique_lock lock(v_thread__mutex);
 		while (a_thread->v_internal) v_thread__condition.wait(lock);
+	});
+}
+
+template<typename T_type>
+void t_engine<T_type>::f_join_foregrounds()
+{
+	f_epoch_region<T_type>([this]
+	{
+		std::unique_lock lock(v_thread__mutex);
+		auto tail = v_thread__finalizer ? v_thread__finalizer : v_thread__main;
+		while (true) {
+			auto p = v_thread__head;
+			while (p != tail && (p->v_done > 0 || p->v_background)) p = p->v_next;
+			if (p == tail) break;
+			v_thread__condition.wait(lock);
+		}
+		v_exiting = true;
+	});
+}
+
+template<typename T_type>
+void t_engine<T_type>::f_quit_finalizer()
+{
+	f_collect();
+	f_finalize();
+	assert(v_thread__head == v_thread__finalizer);
+	f_epoch_region<T_type>([this]
+	{
+		v_finalizer__conductor.f_quit();
+		std::unique_lock lock(v_thread__mutex);
+		while (v_thread__head->v_next && v_thread__head->v_done <= 0) v_thread__condition.wait(lock);
 	});
 }
 

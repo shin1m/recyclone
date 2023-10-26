@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = true;
 	t_engine<t_type> engine(options);
-	return engine.f_run([]
+	return []() RECYCLONE__NOINLINE
 	{
 		auto towers = f_hanoi(
 			f_new<t_pair>(f_new<t_symbol>("a"sv),
@@ -76,5 +76,5 @@ int main(int argc, char* argv[])
 		});
 		assert(s == "(() () (a b c d e))");
 		return 0;
-	});
+	}();
 }

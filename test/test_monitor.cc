@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 	if (argc > 1) std::sscanf(argv[1], "%zu", &options.v_collector__threshold);
 	options.v_verbose = true;
 	t_engine_with_threads engine(options);
-	return engine.f_run([&]
+	return [&]() RECYCLONE__NOINLINE
 	{
 		auto RECYCLONE__SPILL monitor = f_new<t_symbol>("monitor"sv);
 		auto& mutex = monitor->f_extension()->v_mutex;
@@ -122,6 +122,7 @@ int main(int argc, char* argv[])
 			std::printf("%s\n", log.c_str());
 		});
 		assert(log == "Hello, World.");
+		engine.f_join_foregrounds();
 		return 0;
-	});
+	}();
 }
