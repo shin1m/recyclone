@@ -7,15 +7,9 @@
 #include <csignal>
 #endif
 #include <cstring>
-#ifdef __unix__
-#include <unistd.h>
-#include <sys/resource.h>
-#endif
 #ifdef RECYCLONE__COOPERATIVE
 #ifdef __unix__
-#ifdef __EMSCRIPTEN__
-#include <emscripten/stack.h>
-#else
+#ifndef __EMSCRIPTEN__
 #include <ucontext.h>
 #endif
 #endif
@@ -37,36 +31,6 @@ class t_thread
 	friend class t_weak_pointer<T_type>;
 	friend void f_epoch_point<T_type>();
 	template<typename> friend auto f_epoch_region(auto);
-
-	static size_t f_page()
-	{
-#ifdef __unix__
-		return sysconf(_SC_PAGESIZE);
-#endif
-#ifdef _WIN32
-		SYSTEM_INFO si;
-		GetSystemInfo(&si);
-		return si.dwAllocationGranularity;
-#endif
-	}
-	static size_t f_limit()
-	{
-#ifdef __unix__
-#ifdef __EMSCRIPTEN__
-		return emscripten_stack_get_base() - emscripten_stack_get_end();
-#else
-		rlimit limit;
-		if (getrlimit(RLIMIT_STACK, &limit) == -1) throw std::system_error(errno, std::generic_category());
-		return limit.rlim_cur;
-#endif
-#endif
-#ifdef _WIN32
-		ULONG_PTR low;
-		ULONG_PTR high;
-		GetCurrentThreadStackLimits(&low, &high);
-		return high - low;
-#endif
-	}
 
 	static inline RECYCLONE__THREAD t_thread* v_current;
 
@@ -287,22 +251,28 @@ public:
 template<typename T_type>
 void t_thread<T_type>::f_initialize(void* a_bottom)
 {
+	v_stack_bottom = static_cast<t_object<T_type>**>(a_bottom);
 #ifdef __unix__
 	v_handle = pthread_self();
+	pthread_attr_t a;
+	if (auto error = pthread_getattr_np(v_handle, &a)) throw std::system_error(error, std::generic_category());
+	size_t size;
+	if (auto error = pthread_attr_getstack(&a, &v_stack_limit, &size)) throw std::system_error(error, std::generic_category());
+	if (auto error = pthread_attr_destroy(&a)) throw std::system_error(error, std::generic_category());
 #endif
 #ifdef _WIN32
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
 #ifndef RECYCLONE__COOPERATIVE
 	v_context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
 #endif
+	ULONG_PTR low;
+	ULONG_PTR high;
+	GetCurrentThreadStackLimits(&low, &high);
+	v_stack_limit = reinterpret_cast<void*>(low);
 #endif
-	auto limit = f_limit();
-	v_stack_last_size = limit / sizeof(t_object<T_type>*);
+	v_stack_last_size = v_stack_bottom - static_cast<t_object<T_type>**>(v_stack_limit);
 	v_stack_last.reset(new t_object<T_type>*[v_stack_last_size]);
 	v_stack_last_top = v_stack_last.get() + v_stack_last_size;
-	v_stack_bottom = reinterpret_cast<t_object<T_type>**>(a_bottom);
-	auto page = f_page();
-	v_stack_limit = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(a_bottom) + page - 1) / page * page - limit);
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
 	v_increments.v_head = v_increments.v_objects;
