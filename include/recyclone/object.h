@@ -67,18 +67,18 @@ class t_object
 	{
 		t_object* v_previous;
 		t_object* v_chunk_next;
+		t_object* v_next_cycle;
 	};
 	t_object* v_scan;
 	t_color v_color;
 	bool v_finalizee;
+	char v_rank;
 	size_t v_count;
 	union
 	{
 		size_t v_cyclic;
 		size_t v_chunk_size;
 	};
-	size_t v_rank;
-	t_object* v_next_cycle;
 	T_type* v_type;
 	t_extension<T_type>* v_extension;
 
@@ -132,7 +132,7 @@ class t_object
 		v_type->f_decrement_push();
 		v_type = nullptr;
 		if (v_next) {
-			if (!v_previous) return;
+			if (reinterpret_cast<intptr_t>(v_previous) & 1) return;
 			v_next->v_previous = v_previous;
 			v_previous->v_next = v_next;
 		}
@@ -207,7 +207,7 @@ class t_object
 		v_cyclic = v_count;
 		v_next = v_cycle->v_next;
 		v_cycle->v_next = this;
-		v_previous = nullptr;
+		v_previous = reinterpret_cast<t_object*>(1);
 		f_push(this);
 	}
 	void f_collect_white()
@@ -215,7 +215,7 @@ class t_object
 		v_color = e_color__RED;
 		v_cyclic = v_count;
 		v_cycle = v_next = this;
-		v_previous = nullptr;
+		v_previous = reinterpret_cast<t_object*>(1);
 		f_loop<&t_object::f_step<&t_object::f_collect_white_push>>();
 	}
 	void f_scan_red()

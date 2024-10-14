@@ -259,7 +259,7 @@ void t_engine<T_type>::f_collector()
 		while (v_cycles) {
 			std::lock_guard lock(v_object__reviving__mutex);
 			auto cycle = v_cycles;
-			v_cycles = cycle->v_next_cycle;
+			v_cycles = reinterpret_cast<t_object<T_type>*>(reinterpret_cast<intptr_t>(cycle->v_next_cycle) & ~intptr_t(1));
 			auto failed = false;
 			auto finalizee = false;
 			auto p = cycle;
@@ -374,7 +374,7 @@ void t_engine<T_type>::f_collector()
 							auto q = cycle;
 							do q->template f_step<&t_object<T_type>::f_scan_red>(); while ((q = q->v_next) != cycle);
 							do q->v_color = e_color__ORANGE; while ((q = q->v_next) != cycle);
-							cycle->v_next_cycle = v_cycles;
+							cycle->v_next_cycle = reinterpret_cast<t_object<T_type>*>(reinterpret_cast<intptr_t>(v_cycles) | 1);
 							v_cycles = cycle;
 						} else {
 							p->v_next = nullptr;
