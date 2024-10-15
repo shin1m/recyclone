@@ -81,6 +81,7 @@ class t_object
 	};
 	T_type* v_type;
 	t_extension<T_type>* v_extension;
+	T_type* v__type;
 
 	template<void (t_object::*A_push)()>
 	void f_push()
@@ -272,7 +273,7 @@ public:
 	{
 		a_type->f_own();
 		std::atomic_signal_fence(std::memory_order_release);
-		v_type = a_type;
+		v_type = v__type = a_type;
 		t_slot<T_type>::t_decrements::f_push(this);
 	}
 	//! Sets whether the finalizer should finalize the object.
@@ -282,7 +283,7 @@ public:
 	}
 	T_type* f_type() const
 	{
-		return v_type;
+		return v__type;
 	}
 	/*!
 	  Lazily populates the extension part of the object.
