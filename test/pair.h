@@ -4,9 +4,7 @@
 #include "type.h"
 #include <string>
 
-using namespace std::literals;
-
-struct t_pair : t_object<t_type>
+struct t_pair : t__object
 {
 	t_slot_of<t_object<t_type>> v_head;
 	t_slot_of<t_object<t_type>> v_tail;
@@ -28,7 +26,7 @@ struct t_pair : t_object<t_type>
 	}
 };
 
-struct t_symbol : t_object<t_type>
+struct t_symbol : t__object
 {
 	std::string v_name;
 
@@ -36,10 +34,6 @@ struct t_symbol : t_object<t_type>
 	t_symbol(std::string_view a_name) : v_name(a_name)
 	{
 		f_epoch_point<t_type>();
-	}
-	//! Called by t_type_of<t_symbol>::f_scan(...).
-	void f_scan(t_scan<t_type>)
-	{
 	}
 };
 

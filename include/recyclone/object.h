@@ -8,8 +8,6 @@
 namespace recyclone
 {
 
-template<typename> class t_extension;
-
 template<typename T_type>
 using t_scan = void(*)(t_object<T_type>*);
 
@@ -34,7 +32,6 @@ class t_object
 	friend class t_slot<T_type>;
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
-	friend class t_weak_pointer<T_type>;
 
 	//! Roots for candidate cycles.
 	static inline RECYCLONE__THREAD struct
@@ -80,7 +77,6 @@ class t_object
 	size_t v_rank;
 	t_object* v_next_cycle;
 	T_type* v_type;
-	t_extension<T_type>* v_extension;
 
 	template<void (t_object::*A_push)()>
 	void f_push()
@@ -92,7 +88,6 @@ class t_object
 	{
 		v_type->f_scan(this, f_push<A_push>);
 		v_type->template f_push<A_push>();
-		if (auto p = std::atomic_ref(v_extension).load(std::memory_order_consume)) p->f_scan(f_push<A_push>);
 	}
 	template<void (t_object::*A_step)()>
 	void f_loop()
@@ -123,11 +118,6 @@ class t_object
 	}
 	void f_decrement_step()
 	{
-		if (auto p = v_extension) {
-			p->f_scan(f_push<&t_object::f_decrement_push>);
-			v_extension = nullptr;
-			delete p;
-		}
 		v_type->f_finalize(this, f_push<&t_object::f_decrement_push>);
 		v_type->f_decrement_push();
 		v_type = nullptr;
@@ -234,11 +224,6 @@ class t_object
 	}
 	void f_cyclic_decrement()
 	{
-		if (auto p = v_extension) {
-			p->f_scan(f_push<&t_object::f_cyclic_decrement_push>);
-			v_extension = nullptr;
-			delete p;
-		}
 		v_type->f_finalize(this, f_push<&t_object::f_cyclic_decrement_push>);
 		v_type->f_cyclic_decrement_push();
 		v_type = nullptr;
@@ -263,6 +248,7 @@ public:
 	 */
 	t_object() : v_next(nullptr)
 	{
+		assert(v_count == 1 && "zero initialization must not occur.");
 	}
 	/*!
 	  Finalizes the object construction.
@@ -284,11 +270,6 @@ public:
 	{
 		return v_type;
 	}
-	/*!
-	  Lazily populates the extension part of the object.
-	  \return The extension part.
-	 */
-	t_extension<T_type>* f_extension();
 };
 
 template<typename T_type>
@@ -301,18 +282,6 @@ bool t_object<T_type>::f_queue_finalize()
 	engine->v_finalizer__queue.push_back(this);
 	engine->v_finalizer__conductor.f_wake();
 	return true;
-}
-
-template<typename T_type>
-t_extension<T_type>* t_object<T_type>::f_extension()
-{
-	auto p = std::atomic_ref(v_extension).load(std::memory_order_consume);
-	if (p) return p;
-	t_extension<T_type>* q = nullptr;
-	p = new t_extension<T_type>;
-	if (std::atomic_ref(v_extension).compare_exchange_strong(q, p, std::memory_order_consume)) return p;
-	delete p;
-	return q;
 }
 
 }

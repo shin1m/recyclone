@@ -2,7 +2,7 @@
 #define RECYCLONE__ENGINE_H
 
 #include "thread.h"
-#include "extension.h"
+#include <condition_variable>
 #include <deque>
 #ifndef RECYCLONE__COOPERATIVE
 #ifdef __unix__
@@ -20,7 +20,6 @@ template<typename T_type>
 class t_engine
 {
 	friend class t_object<T_type>;
-	friend class t_weak_pointer<T_type>;
 	friend class t_thread<T_type>;
 	friend t_engine* f_engine<T_type>();
 
@@ -202,6 +201,22 @@ public:
 	void f_join_foregrounds();
 	//! Quits finalizer.
 	void f_quit_finalizer();
+	auto f_revive(auto a_get, auto a_do)
+	{
+		v_object__reviving__mutex.lock();
+		auto p = a_get();
+		if (p) {
+			v_object__reviving = true;
+			t_thread<T_type>::v_current->f_revive();
+		}
+		auto x = a_do();
+		v_object__reviving__mutex.unlock();
+		if (p) {
+			t_slot<T_type>::t_increments::f_push(p);
+			t_slot<T_type>::t_decrements::f_push(p);
+		}
+		return x;
+	}
 };
 
 template<typename T_type>
@@ -269,7 +284,7 @@ void t_engine<T_type>::f_collector()
 					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0)
 						failed = true;
 					else if (v_object__reviving)
-					       if (auto p = q->v_extension) if (p->v_weak_pointers__cycle) failed = true;
+					       if (q->v_type->f_reviving(q)) failed = true;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
 					if (p == cycle) break;
@@ -306,7 +321,7 @@ void t_engine<T_type>::f_collector()
 						finalizee = false;
 					} else {
 						do {
-							if (auto q = p->v_extension) q->f_detach();
+							p->v_type->f_prepare_for_finalizer(p);
 							auto q = p->v_next;
 							if (p->v_finalizee) {
 								p->f_increment();

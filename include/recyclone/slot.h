@@ -29,7 +29,6 @@ template<typename> class t_thread;
 template<typename> class t_engine;
 template<typename T_type>
 t_engine<T_type>* f_engine();
-template<typename> class t_weak_pointer;
 
 template<typename T_type>
 class t_slot
@@ -37,7 +36,6 @@ class t_slot
 	friend class t_object<T_type>;
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
-	friend class t_weak_pointer<T_type>;
 
 	template<size_t A_SIZE>
 	struct t_queue
@@ -134,6 +132,15 @@ protected:
 	t_object<T_type>* v_p;
 
 public:
+	static void f_increment(t_object<T_type>* a_p)
+	{
+		t_increments::f_push(a_p);
+	}
+	static void f_decrement(t_object<T_type>* a_p)
+	{
+		t_decrements::f_push(a_p);
+	}
+
 	t_slot() = default;
 	t_slot(t_object<T_type>* a_p) : v_p(a_p)
 	{
@@ -173,6 +180,14 @@ public:
 	{
 		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
 	}
+#ifdef __cpp_lib_atomic_ref
+	std::atomic_ref<t_object<T_type>*> f_raw()
+#else
+	auto& f_raw()
+#endif
+	{
+		return std::atomic_ref(v_p);
+	}
 	t_object<T_type>* f_exchange(t_object<T_type>* a_desired)
 	{
 		if (a_desired) t_increments::f_push(a_desired);
@@ -210,7 +225,7 @@ void t_slot<T_type>::t_queue<A_SIZE>::f_next() noexcept
 	}
 }
 
-template<typename T, typename T_type = typename T::t_type>
+template<typename T, typename T_type = T::t_type>
 struct t_slot_of : t_slot<T_type>
 {
 	using t_slot<T_type>::t_slot;
@@ -245,7 +260,7 @@ struct t_slot_of : t_slot<T_type>
 template<typename T>
 struct t_root : T
 {
-	t_root() : T(T{})
+	t_root() : T{}
 	{
 	}
 	t_root(const t_root& a_value) : T(a_value)

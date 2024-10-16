@@ -8,6 +8,7 @@
 #define NDEBUG
 #endif
 
+using namespace std::literals;
 using namespace recyclone;
 
 #ifdef _WIN32

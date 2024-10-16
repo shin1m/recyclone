@@ -1,5 +1,6 @@
 #include "thread.h"
-#include "pair.h"
+#include "extension.h"
+#include "extension.cc"
 #include <functional>
 
 int main(int argc, char* argv[])
@@ -10,7 +11,7 @@ int main(int argc, char* argv[])
 	t_engine_with_threads engine(options);
 	return [&]() RECYCLONE__NOINLINE
 	{
-		auto RECYCLONE__SPILL monitor = f_new<t_symbol>("monitor"sv);
+		auto RECYCLONE__SPILL monitor = f_new<t_object_with_extension>();
 		auto& mutex = monitor->f_extension()->v_mutex;
 		auto& condition = monitor->f_extension()->v_condition;
 		std::function<void()> action = []

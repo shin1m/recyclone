@@ -28,6 +28,23 @@ struct t_type
 	void f_own()
 	{
 	}
+	bool (*f_reviving)(t_object<t_type>*);
+	void (*f_prepare_for_finalizer)(t_object<t_type>*);
+};
+
+struct t__object : t_object<t_type>
+{
+	//! Called by t_type_of<T>::f_scan(...).
+	void f_scan(t_scan<t_type>)
+	{
+	}
+	bool f_reviving() const
+	{
+		return false;
+	}
+	void f_prepare_for_finalizer()
+	{
+	}
 };
 
 template<typename T>
@@ -49,6 +66,16 @@ struct t_type_of : t_type
 			p->f_scan(a_scan);
 			p->~T();
 		};
+		f_reviving = [](auto a_this)
+		{
+			// Just delegates to a_this.
+			return static_cast<T*>(a_this)->f_reviving();
+		};
+		f_prepare_for_finalizer = [](auto a_this)
+		{
+			// Just delegates to a_this.
+			static_cast<T*>(a_this)->f_prepare_for_finalizer();
+		};
 	}
 };
 
@@ -60,7 +87,11 @@ T* f_new(auto&&... a_xs)
 {
 	f_epoch_point<t_type>();
 	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
-	new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
+	if constexpr (sizeof...(a_xs) > 0)
+		new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
+	else
+		//! To avoid zero initialization.
+		new(p) T;
 	// Finishes object construction.
 	p->f_be(&t_type_of<T>::v_instance);
 	return p;

@@ -10,11 +10,11 @@ jobs:
         configuration: [Debug, Release]
         include:
           - tool: gcc
-            os: ubuntu-latest
-            cxx: g++-12
+            os: ubuntu-24.04
+            cxx: g++-14
           - tool: clang
-            os: ubuntu-latest
-            cxx: clang++-14
+            os: ubuntu-24.04
+            cxx: clang++-18
           - tool: emscripten
             os: ubuntu-latest
             container: emscripten/emsdk
@@ -23,7 +23,7 @@ jobs:
           - tool: msvc
             os: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create Build Environment
         run: cmake -E make_directory build
       - name: Configure CMake

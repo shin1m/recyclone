@@ -1,5 +1,16 @@
 #include "thread.h"
-#include "pair.h"
+#include "extension.h"
+#include "extension.cc"
+
+struct t_symbol : t_object_with_extension
+{
+	std::string v_name;
+
+	t_symbol(std::string_view a_name) : v_name(a_name)
+	{
+		f_epoch_point<t_type>();
+	}
+};
 
 t_root<t_slot_of<t_symbol>> v_resurrected;
 
@@ -24,13 +35,13 @@ int main(int argc, char* argv[])
 		{
 			return std::make_pair(x, y);
 		};
-		std::unique_ptr<t_weak_pointer<t_type>> w;
+		std::unique_ptr<t_weak_pointer> w;
 		f_with_scratch([&]
 		{
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
 			std::fprintf(stderr, "x: %p\n", x);
-			w = std::make_unique<t_weak_pointer<t_type>>(x, false);
+			w = std::make_unique<t_weak_pointer>(x, false);
 			assert(w->f_get() == pair(x, nullptr));
 		});
 		engine.f_collect();
@@ -44,7 +55,7 @@ int main(int argc, char* argv[])
 			std::fprintf(stderr, "x: %p\n", x);
 			auto RECYCLONE__SPILL y = f_new<t_symbol>("bar"sv);
 			std::fprintf(stderr, "y: %p\n", y);
-			w = std::make_unique<t_weak_pointer<t_type>>(x, y);
+			w = std::make_unique<t_weak_pointer>(x, y);
 			assert(w->f_get() == pair(x, y));
 			auto RECYCLONE__SPILL z = f_new<t_symbol>("zot"sv);
 			std::fprintf(stderr, "z: %p\n", z);
@@ -61,7 +72,7 @@ int main(int argc, char* argv[])
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("bar"sv);
 			std::fprintf(stderr, "x: %p\n", x);
 			x->f_finalizee__(true);
-			w = std::make_unique<t_weak_pointer<t_type>>(x, true);
+			w = std::make_unique<t_weak_pointer>(x, true);
 			assert(w->f_get() == pair(x, nullptr));
 		});
 		engine.f_collect();
@@ -83,7 +94,7 @@ int main(int argc, char* argv[])
 			f_epoch_point<t_type>();
 			auto RECYCLONE__SPILL x = f_new<t_symbol>("foo"sv);
 			std::fprintf(stderr, "x: %p\n", x);
-			w = std::make_unique<t_weak_pointer<t_type>>(x, true);
+			w = std::make_unique<t_weak_pointer>(x, true);
 			auto RECYCLONE__SPILL y = f_new<t_symbol>("bar"sv);
 			std::fprintf(stderr, "y: %p\n", y);
 			w->f_target__(y);

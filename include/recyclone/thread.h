@@ -28,7 +28,6 @@ template<typename T_type>
 class t_thread
 {
 	friend class t_engine<T_type>;
-	friend class t_weak_pointer<T_type>;
 	friend void f_epoch_point<T_type>();
 	template<typename> friend auto f_epoch_region(auto);
 

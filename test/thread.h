@@ -4,19 +4,10 @@
 #include "type.h"
 
 //! An example thread implementation.
-struct t_thread : t_object<t_type>
+struct t_thread : t__object
 {
 	//! Required by recyclone.
 	recyclone::t_thread<t_type>* v_internal = nullptr;
-
-	//! To avoid zero initialization.
-	t_thread()
-	{
-	}
-	//! Called by t_type_of<t_thread>::f_scan(...).
-	void f_scan(t_scan<t_type>)
-	{
-	}
 };
 
 struct t_engine_with_threads : t_engine<t_type>
