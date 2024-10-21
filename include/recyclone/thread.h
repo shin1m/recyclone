@@ -81,11 +81,6 @@ class t_thread
 	void* v_stack_limit;
 	//! Current top of the real stack.
 	t_object<T_type>** v_stack_top;
-	/*!
-	  Point at which reviving occurred.
-	  Until this point is processed, the collector postpones cycle collection if there is any object to be actually revived.
-	 */
-	t_object<T_type>* volatile* v_reviving = nullptr;
 
 	t_thread() : v_next(f_engine<T_type>()->v_thread__head)
 	{
@@ -202,10 +197,6 @@ class t_thread
 	}
 #endif
 	void f_epoch();
-	void f_revive()
-	{
-		v_reviving = v_increments.v_head;
-	}
 
 public:
 	static t_thread* f_current()

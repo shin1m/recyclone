@@ -28,7 +28,6 @@ struct t_type
 	void f_own()
 	{
 	}
-	bool (*f_reviving)(t_object<t_type>*);
 	void (*f_prepare_for_finalizer)(t_object<t_type>*);
 };
 
@@ -37,10 +36,6 @@ struct t__object : t_object<t_type>
 	//! Called by t_type_of<T>::f_scan(...).
 	void f_scan(t_scan<t_type>)
 	{
-	}
-	bool f_reviving() const
-	{
-		return false;
 	}
 	void f_prepare_for_finalizer()
 	{
@@ -65,11 +60,6 @@ struct t_type_of : t_type
 			auto p = static_cast<T*>(a_this);
 			p->f_scan(a_scan);
 			p->~T();
-		};
-		f_reviving = [](auto a_this)
-		{
-			// Just delegates to a_this.
-			return static_cast<T*>(a_this)->f_reviving();
 		};
 		f_prepare_for_finalizer = [](auto a_this)
 		{

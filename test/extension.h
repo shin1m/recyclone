@@ -15,7 +15,6 @@ class t_object_with_extension : public t_object<t_type>
 public:
 	~t_object_with_extension();
 	void f_scan(t_scan<t_type> a_scan);
-	bool f_reviving() const;
 	void f_prepare_for_finalizer();
 	/*!
 	  Lazily populates the extension part of the object.
@@ -84,11 +83,6 @@ inline t_object_with_extension::~t_object_with_extension()
 inline void t_object_with_extension::f_scan(t_scan<t_type> a_scan)
 {
 	if (auto p = std::atomic_ref(v_extension).load(std::memory_order_consume)) p->f_scan(a_scan);
-}
-
-inline bool t_object_with_extension::f_reviving() const
-{
-	return v_extension && v_extension->v_weak_pointers__cycle;
 }
 
 inline void t_object_with_extension::f_prepare_for_finalizer()
