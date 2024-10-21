@@ -67,6 +67,7 @@ class t_object
 	};
 	t_object* v_scan;
 	t_color v_color;
+	bool v_reviving;
 	bool v_finalizee;
 	size_t v_count;
 	union

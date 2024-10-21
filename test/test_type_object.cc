@@ -11,10 +11,6 @@ struct t_type : t_object<t_type>
 	  This is where to destruct native part.
 	 */
 	void (*f_finalize)(t_object<t_type>*, t_scan<t_type>);
-	bool f_reviving(t_object<t_type>*)
-	{
-		return false;
-	}
 	void f_prepare_for_finalizer(t_object<t_type>*)
 	{
 	}

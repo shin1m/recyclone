@@ -25,13 +25,9 @@ t_object<t_type>* t_weak_pointer::f_detach()
 t_weak_pointer::t_weak_pointer(t_object_with_extension* a_target, bool a_final) : v_final(a_final)
 {
 	t_root<t_slot_of<t_object_with_extension>> p = a_target;
-	f_engine<t_type>()->f_revive([]
-	{
-		return static_cast<t_object<t_type>*>(nullptr);
-	}, [&]
+	f_engine<t_type>()->f_revive([&](auto)
 	{
 		f_attach(p);
-		return false;
 	});
 }
 
@@ -40,68 +36,57 @@ t_weak_pointer::t_weak_pointer(t_object_with_extension* a_target, t_object<t_typ
 	if (!a_target) a_dependent = nullptr;
 	if (a_dependent) t_slot<t_type>::f_increment(a_dependent);
 	t_root<t_slot_of<t_object_with_extension>> p = a_target;
-	f_engine<t_type>()->f_revive([]
-	{
-		return static_cast<t_object<t_type>*>(nullptr);
-	}, [&]
+	f_engine<t_type>()->f_revive([&](auto)
 	{
 		f_attach(p);
 		v_dependent = a_dependent;
-		return false;
 	});
 }
 
 t_weak_pointer::~t_weak_pointer()
 {
-	auto [p, q] = f_engine<t_type>()->f_revive([&]
+	t_object<t_type>* p;
+	f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
-		return v_target;
-	}, [&]
-	{
-		return std::make_pair(f_detach(), v_dependent);
+		if ((p = f_detach())) a_revive(p);
 	});
 	if (p) t_slot<t_type>::f_decrement(p);
-	if (q) t_slot<t_type>::f_decrement(q);
+	if (v_dependent) t_slot<t_type>::f_decrement(v_dependent);
 }
 
 std::pair<t_object<t_type>*, t_object<t_type>*> t_weak_pointer::f_get() const
 {
-	return f_engine<t_type>()->f_revive([&]
+	t_object<t_type>* p;
+	t_object<t_type>* q;
+	f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
-		return v_target;
-	}, [&]
-	{
-		return std::make_pair(v_target, v_dependent);
+		if ((p = v_target)) a_revive(p);
+		q = v_dependent;
 	});
+	return {p, q};
 }
 
 void t_weak_pointer::f_target__(t_object_with_extension* a_p)
 {
 	t_root<t_slot<t_type>> dependent;
 	t_root<t_slot_of<t_object_with_extension>> p = a_p;
-	if (auto q = f_engine<t_type>()->f_revive([&]
-	{
-		return v_target;
-	}, [&]
+	t_object<t_type>* q;
+	f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
 		if (!a_p) v_dependent = dependent.f_raw().exchange(v_dependent, std::memory_order_relaxed);
-		auto q = f_detach();
+		if ((q = f_detach())) a_revive(q);
 		f_attach(p);
-		return q;
-	})) t_slot<t_type>::f_decrement(q);
+	});
+	if (q) t_slot<t_type>::f_decrement(q);
 }
 
 void t_weak_pointer::f_dependent__(t_object<t_type>* a_p)
 {
 	if (v_final) throw std::runtime_error("cannot have a dependent.");
 	t_root<t_slot<t_type>> dependent = a_p;
-	f_engine<t_type>()->f_revive([&]
-	{
-		return v_target;
-	}, [&]
+	f_engine<t_type>()->f_revive([&](auto)
 	{
 		if (v_target) v_dependent = dependent.f_raw().exchange(v_dependent, std::memory_order_relaxed);
-		return false;
 	});
 }
 

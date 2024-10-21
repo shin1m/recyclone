@@ -201,21 +201,13 @@ public:
 	void f_join_foregrounds();
 	//! Quits finalizer.
 	void f_quit_finalizer();
-	auto f_revive(auto a_get, auto a_do)
+	void f_revive(auto a_do)
 	{
-		v_object__reviving__mutex.lock();
-		auto p = a_get();
-		if (p) {
-			v_object__reviving = true;
-			t_thread<T_type>::v_current->f_revive();
-		}
-		auto x = a_do();
-		v_object__reviving__mutex.unlock();
-		if (p) {
-			t_slot<T_type>::t_increments::f_push(p);
-			t_slot<T_type>::t_decrements::f_push(p);
-		}
-		return x;
+		std::lock_guard lock(v_object__reviving__mutex);
+		a_do([&](t_object<T_type>* a_p)
+		{
+			v_object__reviving = a_p->v_reviving = true;
+		});
 	}
 };
 
@@ -248,20 +240,7 @@ void t_engine<T_type>::f_collector()
 					active = v_finalizer__awaken;
 					if (active && v_finalizer__sleeping) --v_finalizer__awaken;
 				}
-				if (active) {
-					auto tail = q->v_increments.v_tail;
-					q->f_epoch();
-					std::lock_guard lock(v_object__reviving__mutex);
-					if (q->v_reviving) {
-						size_t n = t_slot<T_type>::t_increments::V_SIZE;
-						size_t epoch = (q->v_increments.v_tail + n - tail) % n;
-						size_t reviving = (q->v_reviving + n - tail) % n;
-						if (epoch < reviving)
-							v_object__reviving = true;
-						else
-							q->v_reviving = nullptr;
-					}
-				}
+				if (active) q->f_epoch();
 				if (q->v_done < 3) {
 					p = &q->v_next;
 				} else {
@@ -281,10 +260,8 @@ void t_engine<T_type>::f_collector()
 			while (true) {
 				auto q = p->v_next;
 				if (q->v_type) {
-					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0)
-						failed = true;
-					else if (v_object__reviving)
-					       if (q->v_type->f_reviving(q)) failed = true;
+					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0 || v_object__reviving && q->v_reviving) failed = true;
+					q->v_reviving = false;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
 					if (p == cycle) break;
