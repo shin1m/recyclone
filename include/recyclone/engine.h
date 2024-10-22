@@ -58,6 +58,8 @@ class t_engine
 			f_run();
 		}
 	};
+	//! The longest case after losing the last reference is missing an epoch -> skipping an epoch -> collected as a candidate cycle -> false reviving -> freed as a cycle.
+	static constexpr size_t V_COLLECTION_WAIT_COUNT = 5;
 
 protected:
 	static inline RECYCLONE__THREAD t_engine* v_instance;
@@ -71,7 +73,6 @@ protected:
 	t_object<T_type>* v_cycles = nullptr;
 	t_heap<t_object<T_type>> v_object__heap;
 	size_t v_object__lower = 0;
-	bool v_object__reviving = false;
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
@@ -201,12 +202,12 @@ public:
 	void f_join_foregrounds();
 	//! Quits finalizer.
 	void f_quit_finalizer();
-	void f_revive(auto a_do)
+	auto f_revive(auto a_do)
 	{
 		std::lock_guard lock(v_object__reviving__mutex);
-		a_do([&](t_object<T_type>* a_p)
+		return a_do([&](t_object<T_type>* a_p)
 		{
-			v_object__reviving = a_p->v_reviving = true;
+			a_p->v_reviving = true;
 		});
 	}
 };
@@ -221,10 +222,6 @@ void t_engine<T_type>::f_collector()
 		v_collector__conductor.f_next();
 		if (v_collector__conductor.v_quitting) break;
 		++v_collector__epoch;
-		{
-			std::lock_guard lock(v_object__reviving__mutex);
-			v_object__reviving = false;
-		}
 		{
 			std::lock_guard lock(v_thread__mutex);
 			size_t stack = 0;
@@ -260,7 +257,7 @@ void t_engine<T_type>::f_collector()
 			while (true) {
 				auto q = p->v_next;
 				if (q->v_type) {
-					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0 || v_object__reviving && q->v_reviving) failed = true;
+					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0 || q->v_reviving) failed = true;
 					q->v_reviving = false;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
@@ -522,9 +519,9 @@ t_engine<T_type>::~t_engine()
 	f_finalize(v_thread__main);
 	v_collector__full.fetch_add(1, std::memory_order_relaxed);
 #ifdef RECYCLONE__COOPERATIVE
-	for (size_t i = 0; i < 4; ++i) f__wait();
+	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f__wait();
 #else
-	for (size_t i = 0; i < 4; ++i) f_wait();
+	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f_wait();
 #endif
 	v_collector__conductor.f_quit();
 	assert(!v_thread__head);
@@ -572,7 +569,7 @@ template<typename T_type>
 void t_engine<T_type>::f_collect()
 {
 	v_collector__full.fetch_add(1, std::memory_order_relaxed);
-	for (size_t i = 0; i < 4; ++i) f_wait();
+	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f_wait();
 	v_collector__full.fetch_sub(1, std::memory_order_relaxed);
 }
 

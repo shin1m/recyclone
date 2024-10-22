@@ -45,39 +45,36 @@ t_weak_pointer::t_weak_pointer(t_object_with_extension* a_target, t_object<t_typ
 
 t_weak_pointer::~t_weak_pointer()
 {
-	t_object<t_type>* p;
-	f_engine<t_type>()->f_revive([&](auto a_revive)
+	if (auto p = f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
-		if ((p = f_detach())) a_revive(p);
-	});
-	if (p) t_slot<t_type>::f_decrement(p);
+		auto p = f_detach();
+		if (p) a_revive(p);
+		return p;
+	})) t_slot<t_type>::f_decrement(p);
 	if (v_dependent) t_slot<t_type>::f_decrement(v_dependent);
 }
 
 std::pair<t_object<t_type>*, t_object<t_type>*> t_weak_pointer::f_get() const
 {
-	t_object<t_type>* p;
-	t_object<t_type>* q;
-	f_engine<t_type>()->f_revive([&](auto a_revive)
+	return f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
-		if ((p = v_target)) a_revive(p);
-		q = v_dependent;
+		if (v_target) a_revive(v_target);
+		return std::make_pair(v_target, v_dependent);
 	});
-	return {p, q};
 }
 
 void t_weak_pointer::f_target__(t_object_with_extension* a_p)
 {
 	t_root<t_slot<t_type>> dependent;
 	t_root<t_slot_of<t_object_with_extension>> p = a_p;
-	t_object<t_type>* q;
-	f_engine<t_type>()->f_revive([&](auto a_revive)
+	if (auto q = f_engine<t_type>()->f_revive([&](auto a_revive)
 	{
 		if (!a_p) v_dependent = dependent.f_raw().exchange(v_dependent, std::memory_order_relaxed);
-		if ((q = f_detach())) a_revive(q);
+		auto q = f_detach();
+		if (q) a_revive(q);
 		f_attach(p);
-	});
-	if (q) t_slot<t_type>::f_decrement(q);
+		return q;
+	})) t_slot<t_type>::f_decrement(q);
 }
 
 void t_weak_pointer::f_dependent__(t_object<t_type>* a_p)
