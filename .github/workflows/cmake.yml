@@ -18,7 +18,6 @@ jobs:
           - tool: emscripten
             os: ubuntu-latest
             container: emscripten/emsdk
-            v8_options: --experimental-wasm-threads
             emcmake: emcmake
           - tool: msvc
             os: windows-latest
@@ -29,7 +28,6 @@ jobs:
       - name: Configure CMake
         env:
           CXX: ${{matrix.cxx}}
-          V8_OPTIONS: ${{matrix.v8_options}}
         working-directory: build
         run: ${{matrix.emcmake}} cmake .. -DCMAKE_BUILD_TYPE=${{matrix.configuration}}
       - name: Build
