@@ -40,7 +40,7 @@ class t_slot
 	template<size_t A_SIZE>
 	struct t_queue
 	{
-		static constexpr size_t V_SIZE = A_SIZE;
+		static constexpr size_t c_SIZE = A_SIZE;
 
 		static inline RECYCLONE__THREAD t_queue* v_instance;
 #ifdef _WIN32
@@ -68,14 +68,14 @@ class t_slot
 #endif
 		}
 
-		t_object<T_type>* volatile v_objects[V_SIZE];
+		t_object<T_type>* volatile v_objects[c_SIZE];
 		std::atomic<t_object<T_type>* volatile*> v_epoch;
-		t_object<T_type>* volatile* v_tail{v_objects + V_SIZE - 1};
+		t_object<T_type>* volatile* v_tail{v_objects + c_SIZE - 1};
 
 		void f_next() noexcept;
 		void f__flush(t_object<T_type>* volatile* a_epoch, auto a_do)
 		{
-			auto end = v_objects + V_SIZE - 1;
+			auto end = v_objects + c_SIZE - 1;
 			if (a_epoch > v_objects)
 				--a_epoch;
 			else
@@ -213,15 +213,15 @@ template<size_t A_SIZE>
 void t_slot<T_type>::t_queue<A_SIZE>::f_next() noexcept
 {
 	f_engine<T_type>()->f_tick();
-	if (v_head < v_objects + V_SIZE - 1) {
+	if (v_head < v_objects + c_SIZE - 1) {
 		++v_head;
 		while (v_tail == v_head) f_engine<T_type>()->f_wait();
 		auto tail = v_tail;
-		v_next = std::min(tail < v_head ? v_objects + V_SIZE - 1 : tail - 1, v_head + V_SIZE / 8);
+		v_next = std::min(tail < v_head ? v_objects + c_SIZE - 1 : tail - 1, v_head + c_SIZE / 8);
 	} else {
 		v_head = v_objects;
 		while (v_tail == v_head) f_engine<T_type>()->f_wait();
-		v_next = std::min(v_tail - 1, v_head + V_SIZE / 8);
+		v_next = std::min(v_tail - 1, v_head + c_SIZE / 8);
 	}
 }
 

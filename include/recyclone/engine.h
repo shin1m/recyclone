@@ -59,7 +59,7 @@ class t_engine
 		}
 	};
 	//! The longest case after losing the last reference is missing an epoch -> skipping an epoch -> collected as a candidate cycle -> false reviving -> freed as a cycle.
-	static constexpr size_t V_COLLECTION_WAIT_COUNT = 5;
+	static constexpr size_t c_COLLECTION_WAIT_COUNT = 5;
 
 protected:
 	static inline RECYCLONE__THREAD t_engine* v_instance;
@@ -115,7 +115,7 @@ protected:
 	}
 	t_object<T_type>* f_object__find(void* a_p)
 	{
-		if (reinterpret_cast<uintptr_t>(a_p) & t_heap<t_object<T_type>>::V_UNIT - 1) return nullptr;
+		if (reinterpret_cast<uintptr_t>(a_p) & t_heap<t_object<T_type>>::c_UNIT - 1) return nullptr;
 		auto p = v_object__heap.f_find(a_p);
 		return p && p->v_type ? p : nullptr;
 	}
@@ -257,7 +257,7 @@ void t_engine<T_type>::f_collector()
 			while (true) {
 				auto q = p->v_next;
 				if (q->v_type) {
-					if (q->v_color != e_color__ORANGE || q->v_cyclic > 0 || q->v_reviving) failed = true;
+					if (q->v_color != c_color__ORANGE || q->v_cyclic > 0 || q->v_reviving) failed = true;
 					q->v_reviving = false;
 					if (q->v_finalizee) finalizee = true;
 					p = q;
@@ -274,16 +274,16 @@ void t_engine<T_type>::f_collector()
 			if (!cycle) continue;
 			if (failed) {
 				p = cycle;
-				if (p->v_color == e_color__ORANGE) p->v_color = e_color__PURPLE;
+				if (p->v_color == c_color__ORANGE) p->v_color = c_color__PURPLE;
 				do {
 					auto q = p->v_next;
 					if (p->v_count <= 0) {
 						p->v_next = garbage;
 						garbage = p;
-					} else if (p->v_color == e_color__PURPLE) {
+					} else if (p->v_color == c_color__PURPLE) {
 						t_object<T_type>::f_append(p);
 					} else {
-						p->v_color = e_color__BLACK;
+						p->v_color = c_color__BLACK;
 						p->v_next = nullptr;
 					}
 					p = q;
@@ -302,7 +302,7 @@ void t_engine<T_type>::f_collector()
 								p->v_next = nullptr;
 								v_finalizer__queue.push_back(p);
 							} else {
-								p->v_color = e_color__PURPLE;
+								p->v_color = c_color__PURPLE;
 								t_object<T_type>::f_append(p);
 							}
 							p = q;
@@ -311,7 +311,7 @@ void t_engine<T_type>::f_collector()
 					}
 				}
 				if (!finalizee) {
-					do p->v_color = e_color__RED; while ((p = p->v_next) != cycle);
+					do p->v_color = c_color__RED; while ((p = p->v_next) != cycle);
 					do p->f_cyclic_decrement(); while ((p = p->v_next) != cycle);
 					do {
 						auto q = p->v_next;
@@ -339,7 +339,7 @@ void t_engine<T_type>::f_collector()
 					auto q = p->v_next;
 					do {
 						assert(q->v_count > 0);
-						if (q->v_color == e_color__PURPLE) {
+						if (q->v_color == c_color__PURPLE) {
 							q->f_mark_gray();
 							p = q;
 						} else {
@@ -357,12 +357,12 @@ void t_engine<T_type>::f_collector()
 					do {
 						auto p = roots->v_next;
 						roots->v_next = p->v_next;
-						if (p->v_color == e_color__WHITE) {
+						if (p->v_color == c_color__WHITE) {
 							p->f_collect_white();
 							auto cycle = t_object<T_type>::v_cycle;
 							auto q = cycle;
 							do q->template f_step<&t_object<T_type>::f_scan_red>(); while ((q = q->v_next) != cycle);
-							do q->v_color = e_color__ORANGE; while ((q = q->v_next) != cycle);
+							do q->v_color = c_color__ORANGE; while ((q = q->v_next) != cycle);
 							cycle->v_next_cycle = v_cycles;
 							v_cycles = cycle;
 						} else {
@@ -519,9 +519,9 @@ t_engine<T_type>::~t_engine()
 	f_finalize(v_thread__main);
 	v_collector__full.fetch_add(1, std::memory_order_relaxed);
 #ifdef RECYCLONE__COOPERATIVE
-	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f__wait();
+	for (size_t i = 0; i < c_COLLECTION_WAIT_COUNT; ++i) f__wait();
 #else
-	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f_wait();
+	for (size_t i = 0; i < c_COLLECTION_WAIT_COUNT; ++i) f_wait();
 #endif
 	v_collector__conductor.f_quit();
 	assert(!v_thread__head);
@@ -569,7 +569,7 @@ template<typename T_type>
 void t_engine<T_type>::f_collect()
 {
 	v_collector__full.fetch_add(1, std::memory_order_relaxed);
-	for (size_t i = 0; i < V_COLLECTION_WAIT_COUNT; ++i) f_wait();
+	for (size_t i = 0; i < c_COLLECTION_WAIT_COUNT; ++i) f_wait();
 	v_collector__full.fetch_sub(1, std::memory_order_relaxed);
 }
 

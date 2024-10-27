@@ -266,10 +266,10 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
 	v_increments.v_head = v_increments.v_objects;
-	t_slot<T_type>::t_increments::v_next = v_increments.v_objects + t_slot<T_type>::t_increments::V_SIZE / 8;
+	t_slot<T_type>::t_increments::v_next = v_increments.v_objects + t_slot<T_type>::t_increments::c_SIZE / 8;
 	t_slot<T_type>::t_decrements::v_instance = &v_decrements;
 	v_decrements.v_head = v_decrements.v_objects;
-	t_slot<T_type>::t_decrements::v_next = v_decrements.v_objects + t_slot<T_type>::t_decrements::V_SIZE / 8;
+	t_slot<T_type>::t_decrements::v_next = v_decrements.v_objects + t_slot<T_type>::t_decrements::c_SIZE / 8;
 	v_done = 0;
 }
 

@@ -13,13 +13,13 @@ using t_scan = void(*)(t_object<T_type>*);
 
 enum t_color : char
 {
-	e_color__BLACK,
-	e_color__PURPLE,
-	e_color__GRAY,
-	e_color__WHITING,
-	e_color__WHITE,
-	e_color__ORANGE,
-	e_color__RED
+	c_color__BLACK,
+	c_color__PURPLE,
+	c_color__GRAY,
+	c_color__WHITING,
+	c_color__WHITE,
+	c_color__ORANGE,
+	c_color__RED
 };
 
 template<typename T_type>
@@ -104,14 +104,14 @@ class t_object
 	RECYCLONE__FORCE_INLINE void f_increment()
 	{
 		++v_count;
-		v_color = e_color__BLACK;
+		v_color = c_color__BLACK;
 	}
 	bool f_queue_finalize();
 	void f_decrement_push()
 	{
 		assert(v_count > 0);
 		if (--v_count > 0) {
-			v_color = e_color__PURPLE;
+			v_color = c_color__PURPLE;
 			if (!v_next) f_append(this);
 		} else if (!v_finalizee || !f_queue_finalize()) {
 			f_push(this);
@@ -133,7 +133,7 @@ class t_object
 	{
 		assert(v_count > 0);
 		if (--v_count > 0) {
-			v_color = e_color__PURPLE;
+			v_color = c_color__PURPLE;
 			if (!v_next) f_append(this);
 		} else if (!v_finalizee || !f_queue_finalize()) {
 			f_loop<&t_object::f_decrement_step>();
@@ -141,8 +141,8 @@ class t_object
 	}
 	void f_mark_gray_push()
 	{
-		if (v_color != e_color__GRAY) {
-			v_color = e_color__GRAY;
+		if (v_color != c_color__GRAY) {
+			v_color = c_color__GRAY;
 			v_cyclic = v_count;
 			f_push(this);
 		}
@@ -150,42 +150,42 @@ class t_object
 	}
 	void f_mark_gray()
 	{
-		v_color = e_color__GRAY;
+		v_color = c_color__GRAY;
 		v_cyclic = v_count;
 		f_loop<&t_object::f_step<&t_object::f_mark_gray_push>>();
 	}
 	void f_scan_black_push()
 	{
-		if (v_color == e_color__BLACK) return;
-		v_color = e_color__BLACK;
+		if (v_color == c_color__BLACK) return;
+		v_color = c_color__BLACK;
 		f_push(this);
 	}
 	void f_scan_gray_scan_black_push()
 	{
-		if (v_color == e_color__BLACK) return;
-		if (v_color != e_color__WHITING) f_push(this);
-		v_color = e_color__BLACK;
+		if (v_color == c_color__BLACK) return;
+		if (v_color != c_color__WHITING) f_push(this);
+		v_color = c_color__BLACK;
 	}
 	void f_scan_gray_push()
 	{
-		if (v_color != e_color__GRAY) return;
-		v_color = v_cyclic > 0 ? e_color__BLACK : e_color__WHITING;
+		if (v_color != c_color__GRAY) return;
+		v_color = v_cyclic > 0 ? c_color__BLACK : c_color__WHITING;
 		f_push(this);
 	}
 	void f_scan_gray_step()
 	{
-		if (v_color == e_color__BLACK) {
+		if (v_color == c_color__BLACK) {
 			f_step<&t_object::f_scan_gray_scan_black_push>();
 		} else {
-			v_color = e_color__WHITE;
+			v_color = c_color__WHITE;
 			f_step<&t_object::f_scan_gray_push>();
 		}
 	}
 	void f_scan_gray()
 	{
-		if (v_color != e_color__GRAY) return;
+		if (v_color != c_color__GRAY) return;
 		if (v_cyclic > 0) {
-			v_color = e_color__BLACK;
+			v_color = c_color__BLACK;
 			f_loop<&t_object::f_step<&t_object::f_scan_black_push>>();
 		} else {
 			f_loop<&t_object::f_scan_gray_step>();
@@ -193,8 +193,8 @@ class t_object
 	}
 	void f_collect_white_push()
 	{
-		if (v_color != e_color__WHITE) return;
-		v_color = e_color__RED;
+		if (v_color != c_color__WHITE) return;
+		v_color = c_color__RED;
 		v_cyclic = v_count;
 		v_next = v_cycle->v_next;
 		v_cycle->v_next = this;
@@ -203,7 +203,7 @@ class t_object
 	}
 	void f_collect_white()
 	{
-		v_color = e_color__RED;
+		v_color = c_color__RED;
 		v_cyclic = v_count;
 		v_cycle = v_next = this;
 		v_previous = nullptr;
@@ -211,12 +211,12 @@ class t_object
 	}
 	void f_scan_red()
 	{
-		if (v_color == e_color__RED && v_cyclic > 0) --v_cyclic;
+		if (v_color == c_color__RED && v_cyclic > 0) --v_cyclic;
 	}
 	void f_cyclic_decrement_push()
 	{
-		if (v_color == e_color__RED) return;
-		if (v_color == e_color__ORANGE) {
+		if (v_color == c_color__RED) return;
+		if (v_color == c_color__ORANGE) {
 			--v_count;
 			--v_cyclic;
 		} else {
