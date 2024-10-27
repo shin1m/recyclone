@@ -298,7 +298,10 @@ void t_thread<T_type>::f_epoch()
 #ifdef _WIN32
 #ifndef RECYCLONE__COOPERATIVE
 #ifndef NDEBUG
+#pragma warning(push)
+#pragma warning(disable : 4477)
 	std::fprintf(stderr, "RAX: %p\nRCX: %p\nRDX: %p\nRBX: %p\nRSP: %p\nRBP: %p\nRSI: %p\nRDI: %p\nR8: %p\nR9: %p\nR10: %p\nR11: %p\nR12: %p\nR13: %p\nR14: %p\nR15: %p\n", v_context.Rax, v_context.Rcx, v_context.Rdx, v_context.Rbx, v_context.Rsp, v_context.Rbp, v_context.Rsi, v_context.Rdi, v_context.R8, v_context.R9, v_context.R10, v_context.R11, v_context.R12, v_context.R13, v_context.R14, v_context.R15);
+#pragma warning(pop)
 	for (size_t i = 0; i < sizeof(v_context) / sizeof(void*); ++i) std::fprintf(stderr, "%zu: %p\n", i, reinterpret_cast<void**>(&v_context)[i]);
 #endif
 	auto cdecrements = reinterpret_cast<t_object<T_type>**>(&v_context);
