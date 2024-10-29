@@ -33,7 +33,7 @@ struct t_weak_pointers
 
 class t_weak_pointer : t_weak_pointers
 {
-	friend class t_weak_pointers;
+	friend struct t_weak_pointers;
 	friend class t_extension;
 
 	t_object_with_extension* v_target;

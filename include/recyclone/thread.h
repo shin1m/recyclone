@@ -111,7 +111,7 @@ class t_thread
 #endif
 #ifdef _WIN32
 		CONTEXT context{};
-		context.ContextFlags = CONTEXT_INTEGER;
+		context.ContextFlags = CONTEXT_INTEGER | CONTEXT_FLOATING_POINT;
 		GetThreadContext(v_handle, &context);
 #endif
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(&context);
@@ -165,8 +165,9 @@ class t_thread
 		f_engine<T_type>()->f_epoch_wait();
 #endif
 #ifdef _WIN32
-		SuspendThread(v_handle);
-		GetThreadContext(v_handle, &v_context);
+		if (SuspendThread(v_handle) == -1) throw std::system_error(GetLastError(), std::system_category());
+		v_context.ContextFlags = CONTEXT_FULL;
+		if (!GetThreadContext(v_handle, &v_context)) throw std::system_error(GetLastError(), std::system_category());
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(v_context.Rsp);
 		MEMORY_BASIC_INFORMATION mbi;
 		for (auto p = v_stack_top;;) {
@@ -252,9 +253,6 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 #endif
 #ifdef _WIN32
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
-#ifndef RECYCLONE__COOPERATIVE
-	v_context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
-#endif
 	ULONG_PTR low;
 	ULONG_PTR high;
 	GetCurrentThreadStackLimits(&low, &high);
