@@ -202,6 +202,14 @@ public:
 	void f_join_foregrounds();
 	//! Quits finalizer.
 	void f_quit_finalizer();
+	/*!
+	  Performs an operation for reviving objects, synchronizing with the free cycles.
+	  \param a_do An operation which is called with an operation to mark an object reviving.
+	  How to make an object revivable:
+	    - Make the object cyclic.
+	    - Mark the object reviving in \p a_do.
+	  Do not perform \sa t_slot operations involving \sa t_slot::t_increments::f_push or \sa t_slot::t_decrements::f_push in \p a_do, since they cause deadlocks with the free cycles.
+	 */
 	auto f_revive(auto a_do)
 	{
 		std::lock_guard lock(v_object__reviving__mutex);
