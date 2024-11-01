@@ -188,24 +188,6 @@ public:
 	{
 		return std::atomic_ref(v_p);
 	}
-	t_object<T_type>* f_exchange(t_object<T_type>* a_desired)
-	{
-		if (a_desired) t_increments::f_push(a_desired);
-		a_desired = std::atomic_ref(v_p).exchange(a_desired, std::memory_order_relaxed);
-		if (a_desired) t_decrements::f_push(a_desired);
-		return a_desired;
-	}
-	bool f_compare_exchange(t_object<T_type>*& a_expected, t_object<T_type>* a_desired)
-	{
-		if (a_desired) t_increments::f_push(a_desired);
-		if (std::atomic_ref(v_p).compare_exchange_strong(a_expected, a_desired)) {
-			if (a_expected) t_decrements::f_push(a_expected);
-			return true;
-		} else {
-			if (a_desired) t_decrements::f_push(a_desired);
-			return false;
-		}
-	}
 };
 
 template<typename T_type>
@@ -246,14 +228,6 @@ struct t_slot_of : t_slot<T_type>
 	T* operator->() const
 	{
 		return static_cast<T*>(std::atomic_ref(this->v_p).load(std::memory_order_relaxed));
-	}
-	T* f_exchange(T* a_desired)
-	{
-		return static_cast<T*>(t_slot<T_type>::f_exchange(a_desired));
-	}
-	bool f_compare_exchange(T*& a_expected, T* a_desired)
-	{
-		return t_slot<T_type>::f_compare_exchange(reinterpret_cast<t_object<T_type>*&>(a_expected), a_desired);
 	}
 };
 
