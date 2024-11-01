@@ -112,7 +112,7 @@ class t_thread
 #ifdef _WIN32
 		CONTEXT context{};
 		context.ContextFlags = CONTEXT_INTEGER | CONTEXT_FLOATING_POINT;
-		GetThreadContext(v_handle, &context);
+		if (!GetThreadContext(v_handle, &context)) throw std::system_error(GetLastError(), std::system_category());
 #endif
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(&context);
 		f_epoch__get();
@@ -161,7 +161,7 @@ class t_thread
 	void f_epoch_suspend()
 	{
 #ifdef __unix__
-		pthread_kill(v_handle, RECYCLONE__SIGNAL_SUSPEND);
+		if (auto error = pthread_kill(v_handle, RECYCLONE__SIGNAL_SUSPEND)) throw std::system_error(error, std::generic_category());
 		f_engine<T_type>()->f_epoch_wait();
 #endif
 #ifdef _WIN32
@@ -171,7 +171,7 @@ class t_thread
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(v_context.Rsp);
 		MEMORY_BASIC_INFORMATION mbi;
 		for (auto p = v_stack_top;;) {
-			VirtualQuery(p, &mbi, sizeof(mbi));
+			if (VirtualQuery(p, &mbi, sizeof(mbi)) == 0) throw std::system_error(GetLastError(), std::system_category());
 			p = reinterpret_cast<t_object<T_type>**>(static_cast<char*>(mbi.BaseAddress) + mbi.RegionSize);
 			if (mbi.Protect & PAGE_GUARD) {
 				v_stack_top = p;
@@ -186,10 +186,10 @@ class t_thread
 	void f_epoch_resume()
 	{
 #ifdef __unix__
-		pthread_kill(v_handle, RECYCLONE__SIGNAL_RESUME);
+		if (auto error = pthread_kill(v_handle, RECYCLONE__SIGNAL_RESUME)) throw std::system_error(error, std::generic_category());
 #endif
 #ifdef _WIN32
-		ResumeThread(v_handle);
+		if (!ResumeThread(v_handle)) throw std::system_error(GetLastError(), std::system_category());
 #endif
 	}
 	void f_epoch_done()
@@ -252,7 +252,7 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 	if (auto error = pthread_attr_destroy(&a)) throw std::system_error(error, std::generic_category());
 #endif
 #ifdef _WIN32
-	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+	if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &v_handle, 0, FALSE, DUPLICATE_SAME_ACCESS)) throw std::system_error(GetLastError(), std::system_category());
 	ULONG_PTR low;
 	ULONG_PTR high;
 	GetCurrentThreadStackLimits(&low, &high);
