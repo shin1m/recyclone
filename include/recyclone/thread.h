@@ -38,9 +38,9 @@ class t_thread
 	  Running status:
 	    - -1: not started
 	    - 0: running
-	    - 1: done (increment)
-	    - 2: done (decrement and detect candidate cycles)
-	    - 3: done (collect cycles)
+	    - 1: done
+	    - 2: flushed increments
+	    - 3: flushed decrements
 	 */
 	int v_done = -1;
 	typename t_slot<T_type>::t_increments v_increments;
