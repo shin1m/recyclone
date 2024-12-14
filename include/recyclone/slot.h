@@ -40,42 +40,31 @@ class t_slot
 	template<size_t A_SIZE>
 	struct t_queue
 	{
-		static constexpr size_t c_SIZE = A_SIZE;
-
 		static inline RECYCLONE__THREAD t_queue* v_instance;
-#ifdef _WIN32
-		t_object<T_type>* volatile* v_head;
-#else
-		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_head;
-#endif
-		static inline RECYCLONE__THREAD t_object<T_type>* volatile* v_next;
 
 		RECYCLONE__ALWAYS_INLINE static void f_push(t_object<T_type>* a_object)
 		{
-#ifdef _WIN32
-			auto p = v_instance->v_head;
-#else
-			auto p = v_head;
-#endif
-			*p = a_object;
-			if (p == v_next)
-				v_instance->f_next();
-			else
-#ifdef _WIN32
-				[[likely]] v_instance->v_head = p + 1;
-#else
-				[[likely]] v_head = p + 1;
-#endif
+			v_instance->f__push(a_object);
 		}
 
-		t_object<T_type>* volatile v_objects[c_SIZE];
+		t_object<T_type>* volatile* v_head = v_objects;
+		t_object<T_type>* volatile* v_next = v_objects + A_SIZE / 8;
+		t_object<T_type>* volatile v_objects[A_SIZE];
 		std::atomic<t_object<T_type>* volatile*> v_epoch;
-		t_object<T_type>* volatile* v_tail{v_objects + c_SIZE - 1};
+		t_object<T_type>* volatile* v_tail = v_objects + A_SIZE - 1;
 
 		void f_next() noexcept;
+		RECYCLONE__ALWAYS_INLINE void f__push(t_object<T_type>* a_object)
+		{
+			*v_head = a_object;
+			if (v_head == v_next)
+				f_next();
+			else
+				[[likely]] ++v_head;
+		}
 		void f__flush(t_object<T_type>* volatile* a_epoch, auto a_do)
 		{
-			auto end = v_objects + c_SIZE - 1;
+			auto end = v_objects + A_SIZE - 1;
 			if (a_epoch > v_objects)
 				--a_epoch;
 			else
@@ -194,16 +183,17 @@ template<typename T_type>
 template<size_t A_SIZE>
 void t_slot<T_type>::t_queue<A_SIZE>::f_next() noexcept
 {
-	f_engine<T_type>()->f_tick();
-	if (v_head < v_objects + c_SIZE - 1) {
+	auto engine = f_engine<T_type>();
+	engine->f_tick();
+	if (v_head < v_objects + A_SIZE - 1) {
 		++v_head;
-		while (v_tail == v_head) f_engine<T_type>()->f_wait();
+		while (v_tail == v_head) engine->f_wait();
 		auto tail = v_tail;
-		v_next = std::min(tail < v_head ? v_objects + c_SIZE - 1 : tail - 1, v_head + c_SIZE / 8);
+		v_next = std::min(tail < v_head ? v_objects + A_SIZE - 1 : tail - 1, v_head + A_SIZE / 8);
 	} else {
 		v_head = v_objects;
-		while (v_tail == v_head) f_engine<T_type>()->f_wait();
-		v_next = std::min(v_tail - 1, v_head + c_SIZE / 8);
+		while (v_tail == v_head) engine->f_wait();
+		v_next = std::min(v_tail - 1, v_head + A_SIZE / 8);
 	}
 }
 

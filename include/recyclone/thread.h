@@ -78,9 +78,11 @@ class t_thread
 	//! Current top of the real stack.
 	t_object<T_type>** v_stack_top;
 
-	t_thread() : v_next(f_engine<T_type>()->v_thread__head)
+	t_thread()
 	{
-		f_engine<T_type>()->v_thread__head = this;
+		auto engine = f_engine<T_type>();
+		v_next = engine->v_thread__head;
+		engine->v_thread__head = this;
 	}
 #ifdef _WIN32
 	~t_thread()
@@ -162,7 +164,8 @@ class t_thread
 #endif
 #ifdef _WIN32
 		if (SuspendThread(v_handle) == -1) throw std::system_error(GetLastError(), std::system_category());
-		auto context = reinterpret_cast<CONTEXT*>(reinterpret_cast<intptr_t>(f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size) / alignof(CONTEXT) * alignof(CONTEXT)) - 1;
+		auto engine = f_engine<T_type>();
+		auto context = reinterpret_cast<CONTEXT*>(reinterpret_cast<intptr_t>(engine->v_stack__copy.get() + engine->v_stack__copy_size) / alignof(CONTEXT) * alignof(CONTEXT)) - 1;
 		context->ContextFlags = CONTEXT_FULL;
 		if (!GetThreadContext(v_handle, context)) throw std::system_error(GetLastError(), std::system_category());
 		v_stack_top = reinterpret_cast<t_object<T_type>**>(context->Rsp);
@@ -265,18 +268,15 @@ void t_thread<T_type>::f_initialize(void* a_bottom)
 	v_stack_last_top = v_stack_last.get() + v_stack_last_size;
 	v_current = this;
 	t_slot<T_type>::t_increments::v_instance = &v_increments;
-	v_increments.v_head = v_increments.v_objects;
-	t_slot<T_type>::t_increments::v_next = v_increments.v_objects + t_slot<T_type>::t_increments::c_SIZE / 8;
 	t_slot<T_type>::t_decrements::v_instance = &v_decrements;
-	v_decrements.v_head = v_decrements.v_objects;
-	t_slot<T_type>::t_decrements::v_next = v_decrements.v_objects + t_slot<T_type>::t_decrements::c_SIZE / 8;
 	v_done = 0;
 }
 
 template<typename T_type>
 void t_thread<T_type>::f_epoch()
 {
-	auto top0 = f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size;
+	auto engine = f_engine<T_type>();
+	auto top0 = engine->v_stack__copy.get() + engine->v_stack__copy_size;
 	auto bottom1 = v_stack_last.get() + v_stack_last_size;
 	auto top1 = bottom1;
 	if (v_done > 0) {
@@ -297,7 +297,7 @@ void t_thread<T_type>::f_epoch()
 #ifdef _WIN32
 #ifndef RECYCLONE__COOPERATIVE
 #ifndef NDEBUG
-		auto& context = reinterpret_cast<CONTEXT*>(reinterpret_cast<intptr_t>(f_engine<T_type>()->v_stack__copy.get() + f_engine<T_type>()->v_stack__copy_size) / alignof(CONTEXT) * alignof(CONTEXT))[-1];
+		auto& context = reinterpret_cast<CONTEXT*>(reinterpret_cast<intptr_t>(engine->v_stack__copy.get() + engine->v_stack__copy_size) / alignof(CONTEXT) * alignof(CONTEXT))[-1];
 #pragma warning(push)
 #pragma warning(disable : 4477)
 		std::fprintf(stderr, "RAX: %p\nRCX: %p\nRDX: %p\nRBX: %p\nRSP: %p\nRBP: %p\nRSI: %p\nRDI: %p\nR8: %p\nR9: %p\nR10: %p\nR11: %p\nR12: %p\nR13: %p\nR14: %p\nR15: %p\n", context.Rax, context.Rcx, context.Rdx, context.Rbx, context.Rsp, context.Rbp, context.Rsi, context.Rdi, context.R8, context.R9, context.R10, context.R11, context.R12, context.R13, context.R14, context.R15);
@@ -307,14 +307,14 @@ void t_thread<T_type>::f_epoch()
 #endif
 #endif
 	}
-	auto decrements = f_engine<T_type>()->v_stack__copy.get();
+	auto decrements = engine->v_stack__copy.get();
 	{
 		auto top2 = v_stack_last_top;
 		v_stack_last_top = top1;
-		std::lock_guard lock(f_engine<T_type>()->v_object__heap.f_mutex());
+		std::lock_guard lock(engine->v_object__heap.f_mutex());
 		if (top1 < top2)
 			do {
-				auto p = f_engine<T_type>()->f_object__find(*top0++);
+				auto p = engine->f_object__find(*top0++);
 				if (p) p->f_increment();
 				*top1++ = p;
 			} while (top1 < top2);
@@ -324,7 +324,7 @@ void t_thread<T_type>::f_epoch()
 			auto p = *top0++;
 			auto q = *top1;
 			if (p == q) continue;
-			p = f_engine<T_type>()->f_object__find(p);
+			p = engine->f_object__find(p);
 			if (p == q) continue;
 			if (p) p->f_increment();
 			if (q) *decrements++ = q;
@@ -332,7 +332,7 @@ void t_thread<T_type>::f_epoch()
 		}
 	}
 	v_increments.f_flush();
-	for (auto p = f_engine<T_type>()->v_stack__copy.get(); p != decrements; ++p) (*p)->f_decrement();
+	for (auto p = engine->v_stack__copy.get(); p != decrements; ++p) (*p)->f_decrement();
 	v_decrements.f_flush();
 }
 

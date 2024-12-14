@@ -14,9 +14,6 @@ namespace recyclone
 {
 
 template<typename T_type>
-t_engine<T_type>* f_engine();
-
-template<typename T_type>
 class t_engine
 {
 	friend class t_object<T_type>;
