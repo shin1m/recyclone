@@ -14,7 +14,7 @@ jobs:
             cxx: g++-14
           - tool: clang
             os: ubuntu-latest
-            cxx: clang++-18
+            cxx: clang++-19
           - tool: emscripten
             os: ubuntu-latest
             container: emscripten/emsdk
@@ -23,6 +23,9 @@ jobs:
             os: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare clang
+        if: ${{matrix.tool == 'clang'}}
+        run: sudo apt-get install clang-19
       - name: Create Build Environment
         run: cmake -E make_directory build
       - name: Configure CMake

@@ -129,15 +129,31 @@ class t_heap
 	size_t v_allocated = 0;
 	size_t v_freed = 0;
 
+	template<size_t A_rank>
+	static RECYCLONE__ALWAYS_INLINE T* f_pop(T* a_p)
+	{
+#ifdef __GNUC__
+		__builtin_prefetch(reinterpret_cast<char*>(a_p) + std::hardware_constructive_interference_size, 1);
+#endif
+#ifdef _MSC_VER
+		PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, reinterpret_cast<char*>(a_p) + std::hardware_constructive_interference_size, 1);
+#endif
+		v_head<A_rank> = a_p->v_next;
+#ifdef __GNUC__
+		__builtin_prefetch(v_head<A_rank>, 1, 0);
+#endif
+#ifdef _MSC_VER
+		PreFetchCacheLine(PF_NON_TEMPORAL_LEVEL_ALL, v_head<A_rank>);
+#endif
+		return a_p;
+	}
 	template<size_t A_rank, size_t A_size>
 	T* f_allocate_from(t_of<A_rank, A_size>& a_of);
 	template<size_t A_rank, size_t A_size>
 	RECYCLONE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
 	{
-		auto p = v_head<A_rank>;
-		if (!p) [[unlikely]] return f_allocate_from(a_of);
-		v_head<A_rank> = p->v_next;
-		return p;
+		if (auto p = v_head<A_rank>) [[likely]] return f_pop<A_rank>(p);
+		return f_allocate_from(a_of);
 	}
 	T* f_allocate_large(size_t a_size);
 	constexpr T* f_allocate_medium(size_t a_size);
@@ -255,9 +271,7 @@ template<typename T>
 template<size_t A_rank, size_t A_size>
 T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
 {
-	auto p = a_of.f_allocate(*this);
-	v_head<A_rank> = p->v_next;
-	return p;
+	return f_pop<A_rank>(a_of.f_allocate(*this));
 }
 
 template<typename T>
