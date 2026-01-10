@@ -50,6 +50,7 @@ class t_heap
 		std::atomic_size_t v_grown;
 		std::atomic_size_t v_allocated;
 		std::atomic_size_t v_returned;
+		T* v_freeds = nullptr;
 		size_t v_freed = 0;
 
 		T* f_grow(t_heap& a_heap)
@@ -81,30 +82,30 @@ class t_heap
 			v_allocated.fetch_add(p->v_chunk_size, std::memory_order_relaxed);
 			return p;
 		}
-		void f_return(size_t a_n)
+		void f_return(T*& a_p, size_t a_n)
 		{
-			auto p = v_head<A_rank>;
+			auto p = a_p;
 			p->v_chunk_size = a_n;
 			p->v_chunk_next = v_chunks.load(std::memory_order_relaxed);
 			while (!v_chunks.compare_exchange_weak(p->v_chunk_next, p, std::memory_order_release));
-			v_head<A_rank> = nullptr;
+			a_p = nullptr;
 			v_returned.fetch_add(a_n, std::memory_order_relaxed);
 		}
 		void f_return()
 		{
 			size_t n = 0;
 			for (auto p = v_head<A_rank>; p; p = p->v_next) ++n;
-			if (n > 0) f_return(n);
+			if (n > 0) f_return(v_head<A_rank>, n);
 		}
 		void f_flush()
 		{
-			f_return(v_freed);
+			f_return(v_freeds, v_freed);
 			v_freed = 0;
 		}
 		void f_free(T* a_p)
 		{
-			a_p->v_next = v_head<A_rank>;
-			v_head<A_rank> = a_p;
+			a_p->v_next = v_freeds;
+			v_freeds = a_p;
 			if (++v_freed >= A_size) f_flush();
 		}
 		size_t f_live() const
