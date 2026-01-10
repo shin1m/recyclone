@@ -139,7 +139,7 @@ public:
 	struct t_options
 	{
 #ifdef NDEBUG
-		size_t v_collector__threshold = 1024 * 64;
+		size_t v_collector__threshold = 1024 * 512;
 #else
 		size_t v_collector__threshold = 64;
 #endif
