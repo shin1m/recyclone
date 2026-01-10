@@ -69,7 +69,7 @@ class t_slot
 		}
 	};
 #ifdef NDEBUG
-	struct t_increments : t_queue<16384>
+	struct t_increments : t_queue<1024 * 32>
 #else
 	struct t_increments : t_queue<128>
 #endif
@@ -83,7 +83,7 @@ class t_slot
 		}
 	};
 #ifdef NDEBUG
-	struct t_decrements : t_queue<32768>
+	struct t_decrements : t_queue<1024 * 64>
 #else
 	struct t_decrements : t_queue<256>
 #endif
