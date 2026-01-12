@@ -4,23 +4,6 @@
 #include "define.h"
 #include <atomic>
 
-#ifndef __cpp_lib_atomic_ref
-// TODO Workaround for limited usage as temporary objects.
-namespace std
-{
-template<typename T>
-inline atomic<T>& atomic_ref(T& a_x)
-{
-	return reinterpret_cast<atomic<T>&>(a_x);
-}
-template<typename T>
-inline const atomic<T>& atomic_ref(const T& a_x)
-{
-	return reinterpret_cast<const atomic<T>&>(a_x);
-}
-}
-#endif
-
 namespace recyclone
 {
 
@@ -150,30 +133,31 @@ public:
 	}
 	void f_destruct()
 	{
-		if (auto p = std::atomic_ref(v_p).load(std::memory_order_relaxed)) t_decrements::f_push(p);
+		if (auto p = static_cast<t_object<T_type>*>(*this)) t_decrements::f_push(p);
 	}
 	operator bool() const
 	{
-		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
+		return static_cast<t_object<T_type>*>(*this);
 	}
 	operator t_object<T_type>*() const
 	{
+#ifdef __EMSCRIPTEN__
+		// TODO: Workaround for T* const&.
+		return std::atomic_ref(const_cast<t_object<T_type>*&>(v_p)).load(std::memory_order_relaxed);
+#else
 		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
+#endif
 	}
 	template<typename T>
 	explicit operator T*() const
 	{
-		return static_cast<T*>(std::atomic_ref(v_p).load(std::memory_order_relaxed));
+		return static_cast<T*>(static_cast<t_object<T_type>*>(*this));
 	}
 	t_object<T_type>* operator->() const
 	{
-		return std::atomic_ref(v_p).load(std::memory_order_relaxed);
+		return static_cast<t_object<T_type>*>(*this);
 	}
-#ifdef __cpp_lib_atomic_ref
 	std::atomic_ref<t_object<T_type>*> f_raw()
-#else
-	auto& f_raw()
-#endif
 	{
 		return std::atomic_ref(v_p);
 	}
@@ -213,11 +197,11 @@ struct t_slot_of : t_slot<T_type>
 	}
 	operator T*() const
 	{
-		return static_cast<T*>(std::atomic_ref(this->v_p).load(std::memory_order_relaxed));
+		return static_cast<T*>(static_cast<const t_slot<T_type>&>(*this));
 	}
 	T* operator->() const
 	{
-		return static_cast<T*>(std::atomic_ref(this->v_p).load(std::memory_order_relaxed));
+		return static_cast<T*>(*this);
 	}
 };
 
