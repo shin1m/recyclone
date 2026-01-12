@@ -10,10 +10,10 @@ jobs:
         configuration: [Debug, Release]
         include:
           - tool: gcc
-            os: ubuntu-24.04
+            os: ubuntu-latest
             cxx: g++-14
           - tool: clang
-            os: ubuntu-24.04
+            os: ubuntu-latest
             cxx: clang++-18
           - tool: emscripten
             os: ubuntu-latest
