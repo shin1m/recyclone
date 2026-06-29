@@ -105,6 +105,7 @@ class t_object
 	{
 		++v_count;
 		v_color = c_color__BLACK;
+		if (!v_next) f_append(this);
 	}
 	bool f_queue_finalize();
 	void f_decrement_push()
@@ -138,6 +139,17 @@ class t_object
 		} else if (!v_finalizee || !f_queue_finalize()) {
 			f_loop<&t_object::f_decrement_step>();
 		}
+	}
+	void f_prescan_black_push()
+	{
+		if (v_color == c_color__BLACK || v_color == c_color__PURPLE) return;
+		v_color = c_color__BLACK;
+		f_push(this);
+	}
+	void f_prescan_black()
+	{
+		if (v_color != c_color__PURPLE) v_color = c_color__BLACK;
+		f_loop<&t_object::f_step<&t_object::f_prescan_black_push>>();
 	}
 	void f_mark_gray_push()
 	{
@@ -201,13 +213,14 @@ class t_object
 		v_previous = nullptr;
 		f_push(this);
 	}
-	void f_collect_white()
+	t_object* f_collect_white()
 	{
 		v_color = c_color__RED;
 		v_cyclic = v_count;
 		v_cycle = v_next = this;
 		v_previous = nullptr;
 		f_loop<&t_object::f_step<&t_object::f_collect_white_push>>();
+		return v_cycle;
 	}
 	void f_scan_red()
 	{

@@ -100,13 +100,14 @@ Therefore, the cycle collection can be skipped unless the number of live objects
 
 Scanning object graphs is done non-recursively by using an intrusive linked list.
 
-## No Scanning Blacks on Each Increment/Decrement Operation
+## No Scanning Black on Each Increment/Decrement Operation
 
-Increment/decrement operations do not recursively scan blacks.
+Increment/decrement operations do not recursively scan black.
 
-Scanning blacks on every increment/decrement operation turned out to be expensive in the implementation.
+Scanning black on every increment/decrement operation turned out to be expensive in the implementation.
 
 The increment/decrement operations are changed to mark just only their target objects as black/purple respectively.
+Instead, prescanning black is done for all objects in the list just before marking gray.
 
 ## Refurbish
 

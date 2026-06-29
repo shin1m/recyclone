@@ -303,8 +303,8 @@ void t_engine<T_type>::f_collector()
 							p->v_type->f_prepare_for_finalizer(p);
 							auto q = p->v_next;
 							if (p->v_finalizee) {
-								p->f_increment();
 								p->v_next = nullptr;
+								p->f_increment();
 								v_finalizer__queue.push_back(p);
 							} else {
 								p->v_color = c_color__PURPLE;
@@ -340,6 +340,10 @@ void t_engine<T_type>::f_collector()
 				v_object__lower = live;
 				++v_collector__collect;
 				{
+					auto p = roots->v_next;
+					do p->f_prescan_black(); while ((p = p->v_next) != roots);
+				}
+				{
 					auto p = roots;
 					auto q = p->v_next;
 					do {
@@ -351,8 +355,7 @@ void t_engine<T_type>::f_collector()
 							p->v_next = q->v_next;
 							q->v_next = nullptr;
 						}
-						q = p->v_next;
-					} while (q != roots);
+					} while ((q = p->v_next) != roots);
 				}
 				if (roots->v_next != roots) {
 					{
@@ -363,8 +366,7 @@ void t_engine<T_type>::f_collector()
 						auto p = roots->v_next;
 						roots->v_next = p->v_next;
 						if (p->v_color == c_color__WHITE) {
-							p->f_collect_white();
-							auto cycle = t_object<T_type>::v_cycle;
+							auto cycle = p->f_collect_white();
 							auto q = cycle;
 							do q->template f_step<&t_object<T_type>::f_scan_red>(); while ((q = q->v_next) != cycle);
 							do q->v_color = c_color__ORANGE; while ((q = q->v_next) != cycle);
