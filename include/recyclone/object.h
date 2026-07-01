@@ -32,6 +32,8 @@ class t_object
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
 
+	static constexpr size_t c_SURVIVED_LIMIT = 4;
+
 	//! Roots for candidate cycles.
 	static inline RECYCLONE__THREAD struct
 	{
@@ -68,6 +70,7 @@ class t_object
 	t_color v_color;
 	bool v_reviving;
 	bool v_finalizee;
+	unsigned char v_survived = 0;
 	size_t v_count;
 	union
 	{
@@ -150,8 +153,10 @@ class t_object
 		if (v_color != c_color__PURPLE) v_color = c_color__BLACK;
 		f_loop<&t_object::f_step<&t_object::f_prescan_black_push>>();
 	}
+	template<size_t A_threshold>
 	void f_mark_gray_push()
 	{
+		if (A_threshold < c_SURVIVED_LIMIT && v_survived > A_threshold) return;
 		if (v_color != c_color__GRAY) {
 			v_color = c_color__GRAY;
 			v_cyclic = v_count;
@@ -159,28 +164,44 @@ class t_object
 		}
 		--v_cyclic;
 	}
+	template<size_t A_threshold>
 	void f_mark_gray()
 	{
+		if (A_threshold < c_SURVIVED_LIMIT && v_survived > A_threshold) return;
 		v_color = c_color__GRAY;
 		v_cyclic = v_count;
-		f_loop<&t_object::f_step<&t_object::f_mark_gray_push>>();
+		f_loop<&t_object::f_step<&t_object::f_mark_gray_push<A_threshold>>>();
+	}
+	static constexpr void (t_object::*v_mark_grays[])() = {
+		nullptr,
+		&t_object::f_mark_gray<0>,
+		&t_object::f_mark_gray<2>,
+		&t_object::f_mark_gray<c_SURVIVED_LIMIT>
+	};
+	void f_survive()
+	{
+		v_color = c_color__BLACK;
+		if (v_survived < c_SURVIVED_LIMIT) ++v_survived;
 	}
 	void f_scan_black_push()
 	{
 		if (v_color == c_color__BLACK) return;
-		v_color = c_color__BLACK;
+		f_survive();
 		f_push(this);
 	}
 	void f_scan_gray_scan_black_push()
 	{
 		if (v_color == c_color__BLACK) return;
 		if (v_color != c_color__WHITING) f_push(this);
-		v_color = c_color__BLACK;
+		f_survive();
 	}
 	void f_scan_gray_push()
 	{
 		if (v_color != c_color__GRAY) return;
-		v_color = v_cyclic > 0 ? c_color__BLACK : c_color__WHITING;
+		if (v_cyclic > 0)
+			f_survive();
+		else
+			v_color = c_color__WHITING;
 		f_push(this);
 	}
 	void f_scan_gray_step()
@@ -196,7 +217,7 @@ class t_object
 	{
 		if (v_color != c_color__GRAY) return;
 		if (v_cyclic > 0) {
-			v_color = c_color__BLACK;
+			f_survive();
 			f_loop<&t_object::f_step<&t_object::f_scan_black_push>>();
 		} else {
 			f_loop<&t_object::f_scan_gray_step>();

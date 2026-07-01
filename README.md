@@ -132,6 +132,16 @@ The refurbish is changed to buffer them as garbage.
 
 After the free cycles is completed, the buffered garbage objects are released.
 
+## Generational Cycle Collection
+
+For long living objects, the cycle collection is just waste of time.
+
+Based on the generational hypothesis, it is assumed that the objects that survived the cycle collection will survive next time as well.
+
+So, let each object have a count for how many times it survived scanning gray.
+
+Then, abort marking gray when it visited an object that survived more times than expected.
+
 # License
 
 The MIT License (MIT)

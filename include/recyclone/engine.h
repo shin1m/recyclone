@@ -69,7 +69,7 @@ protected:
 	std::atomic_size_t v_collector__full;
 	t_object<T_type>* v_cycles = nullptr;
 	t_heap<t_object<T_type>> v_object__heap;
-	size_t v_object__lower = 0;
+	size_t v_object__lowers[std::size(t_object<T_type>::v_mark_grays) - 1]{};
 	std::mutex v_object__reviving__mutex;
 	size_t v_object__release = 0;
 	size_t v_object__collect = 0;
@@ -97,6 +97,7 @@ protected:
 
 	void f_free(t_object<T_type>* a_p)
 	{
+		a_p->v_survived = 0;
 		a_p->v_count = 1;
 		v_object__heap.f_free(a_p);
 	}
@@ -251,6 +252,7 @@ void t_engine<T_type>::f_collector()
 				}
 			}
 		}
+		auto live0 = v_options.v_verbose && v_cycles ? v_object__heap.f_live() : 0;
 		t_object<T_type>* garbage = nullptr;
 		while (v_cycles) {
 			std::lock_guard lock(v_object__reviving__mutex);
@@ -332,12 +334,24 @@ void t_engine<T_type>::f_collector()
 			p->v_next = nullptr;
 			if (!p->v_finalizee || !p->f_queue_finalize()) p->template f_loop<&t_object<T_type>::f_decrement_step>();
 		}
+		if (live0) {
+			auto live1 = v_object__heap.f_live();
+			std::fprintf(stderr, "collect cycles: %zu -> %zu = %zu\n", live0, live1, live0 - live1);
+		}
 		auto roots = reinterpret_cast<t_object<T_type>*>(&t_object<T_type>::v_roots);
 		if (roots->v_next != roots) {
+			auto full = v_collector__full.load(std::memory_order_relaxed) > 0;
 			auto live = v_object__heap.f_live();
-			if (live < v_object__lower) v_object__lower = live;
-			if (v_collector__full.load(std::memory_order_relaxed) > 0 || live - v_object__lower >= v_options.v_collector__threshold) {
-				v_object__lower = live;
+			for (auto& lower : v_object__lowers) if (live < lower) lower = live;
+			auto mark_grays = t_object<T_type>::v_mark_grays;
+			for (auto last = live; auto& lower : v_object__lowers) {
+				if (!full && last - lower < v_options.v_collector__threshold) break;
+				last = lower;
+				lower = live;
+				++mark_grays;
+			}
+			if (auto mark = *mark_grays) {
+				auto t = std::chrono::steady_clock::now();
 				++v_collector__collect;
 				{
 					auto p = roots->v_next;
@@ -349,7 +363,7 @@ void t_engine<T_type>::f_collector()
 					do {
 						assert(q->v_count > 0);
 						if (q->v_color == c_color__PURPLE) {
-							q->f_mark_gray();
+							(q->*mark)();
 							p = q;
 						} else {
 							p->v_next = q->v_next;
@@ -357,27 +371,35 @@ void t_engine<T_type>::f_collector()
 						}
 					} while ((q = p->v_next) != roots);
 				}
-				if (roots->v_next != roots) {
+				if (roots->v_next == roots) {
+					roots->v_previous = roots;
+				} else {
 					{
 						auto p = roots->v_next;
 						do p->f_scan_gray(); while ((p = p->v_next) != roots);
 					}
+					auto p = roots;
+					auto q = p->v_next;
 					do {
-						auto p = roots->v_next;
-						roots->v_next = p->v_next;
-						if (p->v_color == c_color__WHITE) {
-							auto cycle = p->f_collect_white();
-							auto q = cycle;
+						if (q->v_color == c_color__WHITE) {
+							p->v_next = q->v_next;
+							auto cycle = q = q->f_collect_white();
 							do q->template f_step<&t_object<T_type>::f_scan_red>(); while ((q = q->v_next) != cycle);
 							do q->v_color = c_color__ORANGE; while ((q = q->v_next) != cycle);
 							cycle->v_next_cycle = v_cycles;
 							v_cycles = cycle;
+						} else if (mark == &t_object<T_type>::template f_mark_gray<t_object<T_type>::c_SURVIVED_LIMIT>) {
+							p->v_next = q->v_next;
+							q->v_next = nullptr;
 						} else {
-							p->v_next = nullptr;
+							q->v_color = c_color__PURPLE;
+							q->v_previous = p;
+							p = q;
 						}
-					} while (roots->v_next != roots);
+					} while ((q = p->v_next) != roots);
+					q->v_previous = p;
 				}
-				roots->v_previous = roots;
+				if (v_options.v_verbose) std::fprintf(stderr, "collect candidates(%tu): %g\n", mark_grays - t_object<T_type>::v_mark_grays, std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - t).count());
 			}
 		}
 		v_object__heap.f_flush();
