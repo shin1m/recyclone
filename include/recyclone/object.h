@@ -3,7 +3,6 @@
 
 #include "heap.h"
 #include "slot.h"
-#include <cassert>
 
 namespace recyclone
 {
@@ -270,9 +269,9 @@ public:
 	 */
 	RECYCLONE__ALWAYS_INLINE void f_be(T_type* a_type)
 	{
-		a_type->f_own();
 		std::atomic_signal_fence(std::memory_order_release);
 		v_type = a_type;
+		a_type->f_own();
 		t_slot<T_type>::t_decrements::f_push(this);
 	}
 	//! Sets whether the finalizer should finalize the object.

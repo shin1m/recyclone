@@ -3,6 +3,7 @@
 
 #include "define.h"
 #include <atomic>
+#include <cassert>
 
 namespace recyclone
 {
@@ -39,6 +40,7 @@ class t_slot
 		void f_next() noexcept;
 		RECYCLONE__ALWAYS_INLINE void f__push(t_object<T_type>* a_object)
 		{
+			assert(a_object->v_type != nullptr);
 			*v_head = a_object;
 			if (v_head == v_next)
 				f_next();
