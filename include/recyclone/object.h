@@ -22,6 +22,9 @@ enum t_color : char
 };
 
 template<typename T_type>
+t_object<T_type>* f_allocate(size_t a_size);
+
+template<typename T_type>
 class t_object
 {
 	static_assert(std::is_trivially_default_constructible_v<t_slot<T_type>>);
@@ -31,6 +34,7 @@ class t_object
 	friend class t_slot<T_type>;
 	friend class t_thread<T_type>;
 	friend class t_engine<T_type>;
+	friend t_object* f_allocate<T_type>(size_t a_size);
 
 	//! Roots for candidate cycles.
 	static inline RECYCLONE__THREAD struct
@@ -255,7 +259,7 @@ public:
 	using t_type = T_type;
 
 	/*!
-	  \sa t_engine::f_allocate clears v_next.
+	  \sa f_allocate clears v_next.
 	  But when placement new follows it, it is eliminated by lifetime dse.
 	  The initialization here is a workaround for this case.
 	 */

@@ -19,6 +19,7 @@ class t_engine
 	friend class t_object<T_type>;
 	friend class t_thread<T_type>;
 	friend t_engine* f_engine<T_type>();
+	friend t_object<T_type>* f_allocate<T_type>(size_t a_size);
 
 	struct t_conductor
 	{
@@ -174,13 +175,6 @@ public:
 	{
 		v_collector__wait.fetch_add(1, std::memory_order_relaxed);
 		v_collector__conductor.f_run();
-	}
-	//! Allocates a new object with the size \p a_size.
-	RECYCLONE__ALWAYS_INLINE constexpr t_object<T_type>* f_allocate(size_t a_size)
-	{
-		auto p = v_object__heap.f_allocate(a_size);
-		p->v_next = nullptr;
-		return p;
 	}
 	//! Performs full garbage collection.
 	void f_collect();
@@ -682,6 +676,18 @@ template<typename T_type>
 inline t_engine<T_type>* f_engine()
 {
 	return t_engine<T_type>::v_instance;
+}
+
+//! Allocates a new object with the size \p a_size.
+template<typename T_type>
+inline RECYCLONE__ALWAYS_INLINE t_object<T_type>* f_allocate(size_t a_size)
+{
+	auto p = t_heap<t_object<T_type>>::template f_allocate<[]() -> auto&
+	{
+		return f_engine<T_type>()->v_object__heap;
+	}>(a_size);
+	p->v_next = nullptr;
+	return p;
 }
 
 }

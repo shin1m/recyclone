@@ -22,7 +22,7 @@ struct t_type_of : t_type
 	T* f_new(auto&&... a_xs)
 	{
 		f_epoch_point<t_type>();
-		auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
+		auto p = static_cast<T*>(f_allocate<t_type>(sizeof(T)));
 		new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
 		// Finishes object construction.
 		p->f_be(this);
@@ -37,7 +37,7 @@ struct t_type_of<t_type> : t_type
 	static t_type_of* f_initialize()
 	{
 		f_epoch_point<t_type>();
-		auto p = static_cast<t_type_of*>(f_engine<t_type>()->f_allocate(sizeof(t_type_of)));
+		auto p = static_cast<t_type_of*>(f_allocate<t_type>(sizeof(t_type_of)));
 		p->f_scan = p->f_finalize = [](auto, auto)
 		{
 		};
@@ -51,7 +51,7 @@ struct t_type_of<t_type> : t_type
 	t_type_of<T>* f_new()
 	{
 		f_epoch_point<t_type>();
-		auto p = static_cast<t_type_of<T>*>(f_engine<t_type>()->f_allocate(sizeof(t_type_of<T>)));
+		auto p = static_cast<t_type_of<T>*>(f_allocate<t_type>(sizeof(t_type_of<T>)));
 		p->f_scan = [](auto a_this, auto a_scan)
 		{
 			// Just delegates to a_this.

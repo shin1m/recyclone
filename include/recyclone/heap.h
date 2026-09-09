@@ -119,28 +119,29 @@ class t_heap
 	void(*v_tick)();
 	std::map<T*, size_t> v_blocks;
 	std::mutex v_mutex;
-	t_of<0, 1024 * 64> v_of0;
-	t_of<1, 1024 * 16> v_of1;
-	t_of<2, 1024 * 4> v_of2;
-	t_of<3, 1024> v_of3;
-	t_of<4, 1024 / 4> v_of4;
-	t_of<5, 1024 / 16> v_of5;
-	t_of<6, 1024 / 64> v_of6;
+	t_of<0, 1024 * 16> v_of0;
+	t_of<1, 1024 * 4> v_of1;
+	t_of<2, 1024> v_of2;
+	t_of<3, 1024 / 4> v_of3;
+	t_of<4, 1024 / 16> v_of4;
+	t_of<5, 1024 / 64> v_of5;
+	t_of<6, 1024 / 256> v_of6;
 	size_t v_allocated = 0;
 	size_t v_freed = 0;
 
-	template<size_t A_rank, size_t A_size>
-	T* f_allocate_from(t_of<A_rank, A_size>& a_of);
-	template<size_t A_rank, size_t A_size>
-	RECYCLONE__ALWAYS_INLINE T* f_allocate(t_of<A_rank, A_size>& a_of)
+	template<size_t A_rank, auto t_heap::* A_of>
+	T* f_allocate_from();
+	template<auto A_heap, size_t A_rank, auto t_heap::* A_of>
+	static RECYCLONE__ALWAYS_INLINE T* f_allocate()
 	{
 		auto p = v_head<A_rank>;
-		if (!p) [[unlikely]] return f_allocate_from(a_of);
+		if (!p) [[unlikely]] return A_heap().template f_allocate_from<A_rank, A_of>();
 		v_head<A_rank> = p->v_next;
 		return p;
 	}
 	T* f_allocate_large(size_t a_size);
-	constexpr T* f_allocate_medium(size_t a_size);
+	template<auto A_heap>
+	static T* f_allocate_medium(size_t a_size);
 
 public:
 	static constexpr size_t c_UNIT = std::bit_floor(sizeof(T)) << 1;
@@ -172,10 +173,11 @@ public:
 		a_each(size_t(6), v_of6.v_grown.load(std::memory_order_relaxed), v_of6.v_allocated.load(std::memory_order_relaxed), v_of6.v_returned.load(std::memory_order_relaxed));
 		a_each(size_t(c_RANKX), size_t(0), v_allocated, v_freed);
 	}
-	RECYCLONE__ALWAYS_INLINE constexpr T* f_allocate(size_t a_size)
+	template<auto A_heap>
+	static RECYCLONE__ALWAYS_INLINE T* f_allocate(size_t a_size)
 	{
-		if (a_size <= c_UNIT) [[likely]] return f_allocate(v_of0);
-		return f_allocate_medium(a_size);
+		if (a_size <= c_UNIT) [[likely]] return f_allocate<A_heap, 0, &t_heap::v_of0>();
+		return f_allocate_medium<A_heap>(a_size);
 	}
 	void f_return()
 	{
@@ -252,10 +254,10 @@ public:
 };
 
 template<typename T>
-template<size_t A_rank, size_t A_size>
-T* t_heap<T>::f_allocate_from(t_of<A_rank, A_size>& a_of)
+template<size_t A_rank, auto t_heap<T>::* A_of>
+T* t_heap<T>::f_allocate_from()
 {
-	auto p = a_of.f_allocate(*this);
+	auto p = (this->*A_of).f_allocate(*this);
 	v_head<A_rank> = p->v_next;
 	return p;
 }
@@ -271,15 +273,16 @@ T* t_heap<T>::f_allocate_large(size_t a_size)
 }
 
 template<typename T>
-constexpr T* t_heap<T>::f_allocate_medium(size_t a_size)
+template<auto A_heap>
+T* t_heap<T>::f_allocate_medium(size_t a_size)
 {
-	if (a_size <= c_UNIT << 1) return f_allocate(v_of1);
-	if (a_size <= c_UNIT << 2) return f_allocate(v_of2);
-	if (a_size <= c_UNIT << 3) return f_allocate(v_of3);
-	if (a_size <= c_UNIT << 4) return f_allocate(v_of4);
-	if (a_size <= c_UNIT << 5) return f_allocate(v_of5);
-	if (a_size <= c_UNIT << 6) return f_allocate(v_of6);
-	return f_allocate_large(a_size);
+	if (a_size <= c_UNIT << 1) return f_allocate<A_heap, 1, &t_heap::v_of1>();
+	if (a_size <= c_UNIT << 2) return f_allocate<A_heap, 2, &t_heap::v_of2>();
+	if (a_size <= c_UNIT << 3) return f_allocate<A_heap, 3, &t_heap::v_of3>();
+	if (a_size <= c_UNIT << 4) return f_allocate<A_heap, 4, &t_heap::v_of4>();
+	if (a_size <= c_UNIT << 5) return f_allocate<A_heap, 5, &t_heap::v_of5>();
+	if (a_size <= c_UNIT << 6) return f_allocate<A_heap, 6, &t_heap::v_of6>();
+	return A_heap().f_allocate_large(a_size);
 }
 
 }

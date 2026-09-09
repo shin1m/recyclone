@@ -76,7 +76,7 @@ template<typename T>
 T* f_new(auto&&... a_xs)
 {
 	f_epoch_point<t_type>();
-	auto p = static_cast<T*>(f_engine<t_type>()->f_allocate(sizeof(T)));
+	auto p = static_cast<T*>(f_allocate<t_type>(sizeof(T)));
 	if constexpr (sizeof...(a_xs) > 0)
 		new(p) T(std::forward<decltype(a_xs)>(a_xs)...);
 	else
